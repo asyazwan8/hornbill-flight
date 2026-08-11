@@ -30,6 +30,7 @@ const COLORS: Record<PoseStatus, string> = {
   partial: "#ffd43b",
   tracking: "#7ee0ff",
   tpose: "#8ce99a",
+  dive: "#ff9f43",
 };
 
 /**

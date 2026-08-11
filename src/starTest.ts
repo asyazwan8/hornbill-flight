@@ -140,7 +140,7 @@ const newStars = () => new Stars(new THREE.Scene());
     const flap = wantsHeight && sinceFlap > 0.25 && flight.vy < 8 ? 0.9 : 0;
     if (flap > 0) sinceFlap = 0;
 
-    flight.update(DT, { flap, steer });
+    flight.update(DT, { flap, steer, dive: 0 });
     const got = stars.update(DT, flight.position, flight.heading);
     if (got > 0) {
       score += got;
@@ -152,6 +152,61 @@ const newStars = () => new Stars(new THREE.Scene());
     "an aiming player can score in 60 seconds",
     score >= 8,
     `autopilot collected ${score} stars, closest approach ${closest.toFixed(1)} units`
+  );
+}
+
+/* ---------------- divebomb physics ---------------- */
+{
+  const run = (dive: number, seconds: number) => {
+    const flight = new Flight();
+    flight.reset();
+    const startZ = flight.position.z;
+    const DT = 1 / 60;
+    for (let i = 0; i < seconds / DT; i++) flight.update(DT, { flap: 0, steer: 0, dive });
+    return { drop: 90 - flight.position.y, travelled: flight.position.z - startZ };
+  };
+
+  const glide = run(0, 1.5);
+  const dive = run(1, 1.5);
+
+  check(
+    "diving drops far faster than gliding",
+    dive.drop > glide.drop * 1.8,
+    `dive ${dive.drop.toFixed(0)} units vs glide ${glide.drop.toFixed(0)}`
+  );
+  check(
+    "diving is faster forwards too",
+    dive.travelled > glide.travelled * 1.2,
+    `dive ${dive.travelled.toFixed(0)} units vs glide ${glide.travelled.toFixed(0)}`
+  );
+}
+
+{
+  // A dive must not punch through the floor and out of the world.
+  const flight = new Flight();
+  flight.reset();
+  const DT = 1 / 60;
+  let lowest = Infinity;
+  for (let i = 0; i < 20 / DT; i++) {
+    flight.update(DT, { flap: 0, steer: 0, dive: 1 });
+    lowest = Math.min(lowest, flight.position.y);
+  }
+  check("a sustained dive stays above the canopy", lowest > 20, `lowest altitude ${lowest.toFixed(1)}`);
+}
+
+{
+  // Flapping out of a dive should be impossible until the wings come back out,
+  // otherwise the dive would be cancellable mid-plunge by a twitch.
+  const flight = new Flight();
+  flight.reset();
+  const DT = 1 / 60;
+  for (let i = 0; i < 0.5 / DT; i++) flight.update(DT, { flap: 0, steer: 0, dive: 1 });
+  const before = flight.vy;
+  const flapped = flight.update(DT, { flap: 1, steer: 0, dive: 1 });
+  check(
+    "flapping is ignored while tucked",
+    flapped === 0 && flight.vy < before,
+    `flapStrength=${flapped}, vy ${before.toFixed(1)} -> ${flight.vy.toFixed(1)}`
   );
 }
 

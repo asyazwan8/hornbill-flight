@@ -18,7 +18,15 @@ export type GameEvents = {
   onPhase?: (phase: GamePhase) => void;
   onScore?: (score: number) => void;
   onTime?: (secondsLeft: number) => void;
+  /** A star was picked up. `streak` counts stars collected in quick succession. */
+  onCollect?: (streak: number) => void;
 };
+
+/** Collect another star within this many seconds and the streak keeps building. */
+const STREAK_WINDOW = 2.5;
+
+const FOV_NORMAL = 62;
+const FOV_DIVE = 78;
 
 export class Game {
   readonly scene = new THREE.Scene();
@@ -43,6 +51,9 @@ export class Game {
   private lastWholeSecond = ROUND_SECONDS;
   private camLook = new THREE.Vector3();
 
+  private streak = 0;
+  private sinceCollect = 99;
+
   constructor(canvas: HTMLCanvasElement, events: GameEvents = {}) {
     this.events = events;
 
@@ -51,7 +62,7 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(FOG_COLOR);
 
-    this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.5, 6000);
+    this.camera = new THREE.PerspectiveCamera(FOV_NORMAL, window.innerWidth / window.innerHeight, 0.5, 6000);
 
     this.world = new World(this.scene);
     this.stars = new Stars(this.scene);
@@ -82,6 +93,8 @@ export class Game {
     this.score = 0;
     this.timeLeft = ROUND_SECONDS;
     this.lastWholeSecond = ROUND_SECONDS;
+    this.streak = 0;
+    this.sinceCollect = 99;
     this.flight.reset();
     this.stars.reset(this.flight.position, this.flight.heading);
     this.placeCameraBehindBird(true);
@@ -116,6 +129,10 @@ export class Game {
       new THREE.Vector3(-Math.cos(this.flight.heading), 0, Math.sin(this.flight.heading)),
       this.flight.steer * -7
     );
+    // Drop the camera and pull it back in a dive so the bird stays framed
+    // while it plunges, instead of shooting out of the bottom of the screen.
+    desired.y -= this.flight.dive * 14;
+    desired.addScaledVector(forward, -this.flight.dive * 10);
 
     const lookAhead = new THREE.Vector3(0, -7, 0);
     if (snap) {
@@ -147,17 +164,25 @@ export class Game {
     if (this.phase === "waiting" || this.phase === "gameover") {
       // Idle: the bird drifts on a slow circle so the menu has something alive
       // behind it, and we watch for the player's start signal.
-      this.flight.update(dt, { flap: this.idleFlap(dt), steer: 0.32 });
-      if (this.input?.startRequested()) this.startRun();
+      this.flight.update(dt, { flap: this.idleFlap(dt), steer: 0.32, dive: 0 });
+      // The latch is always drained, but only honoured on the intro screen.
+      // After a run the player has just been posing and flapping, so a stray
+      // T-pose must not relaunch them — the Fly again button is the only way.
+      const requested = this.input?.startRequested() ?? false;
+      if (requested && this.phase === "waiting") this.startRun();
     } else if (this.phase === "playing") {
       const input: FlightInput = this.input ? this.input.sample(dt) : NO_INPUT;
       const flapped = this.flight.update(dt, input);
       if (flapped > 0) this.bird.onFlap(flapped);
 
+      this.sinceCollect += dt;
       const got = this.stars.update(dt, this.flight.position, this.flight.heading);
       if (got > 0) {
         this.score += got;
+        this.streak = this.sinceCollect < STREAK_WINDOW ? this.streak + got : got - 1;
+        this.sinceCollect = 0;
         this.events.onScore?.(this.score);
+        this.events.onCollect?.(this.streak);
       }
 
       this.timeLeft = Math.max(0, this.timeLeft - elapsed);
@@ -171,7 +196,15 @@ export class Game {
 
     this.bird.group.position.copy(this.flight.position);
     this.bird.group.rotation.y = this.flight.heading;
-    this.bird.update(dt, this.flight.bank, this.flight.pitch, this.flight.gliding);
+    this.bird.update(dt, this.flight.bank, this.flight.pitch, this.flight.gliding, this.flight.dive);
+
+    // Widening the lens during a dive is the cheapest possible speed cue, and
+    // it costs nothing but a projection matrix update.
+    const wantedFov = FOV_NORMAL + (FOV_DIVE - FOV_NORMAL) * this.flight.dive;
+    if (Math.abs(this.camera.fov - wantedFov) > 0.01) {
+      this.camera.fov = damp(this.camera.fov, wantedFov, 6, dt);
+      this.camera.updateProjectionMatrix();
+    }
 
     this.world.update(this.flight.position);
     if (this.phase !== "playing") this.stars.update(dt, this.flight.position, this.flight.heading);

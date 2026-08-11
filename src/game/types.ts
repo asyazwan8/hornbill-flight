@@ -4,9 +4,11 @@ export type FlightInput = {
   flap: number;
   /** Steering, -1 (hard left) .. 1 (hard right). */
   steer: number;
+  /** Divebomb, 0..1. Held rather than pulsed: wings tuck and the bird drops. */
+  dive: number;
 };
 
-export const NO_INPUT: FlightInput = { flap: 0, steer: 0 };
+export const NO_INPUT: FlightInput = { flap: 0, steer: 0, dive: 0 };
 
 export type GamePhase = "loading" | "waiting" | "playing" | "gameover";
 

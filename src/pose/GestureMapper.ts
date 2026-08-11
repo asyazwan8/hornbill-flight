@@ -22,6 +22,17 @@ const FLAP_SPEED_STRONG = 5.0;
 /** Minimum gap between two flaps. */
 const FLAP_REFRACTORY = 0.18;
 
+/**
+ * Divebomb: bring both hands together and the bird tucks and drops.
+ *
+ * Measured as the gap between the wrists in shoulder-widths. Arms hanging at
+ * your sides leave a gap of roughly one shoulder-width, and a T-pose is wider
+ * still, so a deliberate "hands together" is unambiguous — and it is the exact
+ * opposite of the T-pose, which is why the two can never be confused.
+ */
+const DIVE_GAP_FULL = 0.35;
+const DIVE_GAP_NONE = 0.7;
+
 /** Shoulder tilt below this is treated as standing straight. */
 const STEER_DEADZONE = 0.09;
 const STEER_GAIN = 2.6;
@@ -32,7 +43,7 @@ const STEER_LEAN_WEIGHT = 0.35;
 
 const MIN_VISIBILITY = 0.5;
 
-export type PoseStatus = "no-pose" | "partial" | "tracking" | "tpose";
+export type PoseStatus = "no-pose" | "partial" | "tracking" | "tpose" | "dive";
 
 export type GestureState = {
   input: FlightInput;
@@ -40,6 +51,8 @@ export type GestureState = {
   tposeProgress: number;
   /** True on the single frame the T-pose completes. */
   tposeComplete: boolean;
+  /** True on the frame a dive begins, for the whoosh. */
+  diveStarted: boolean;
   status: PoseStatus;
   message: string;
 };
@@ -64,12 +77,14 @@ export class GestureMapper {
   private steer = 0;
   private tposeHeld = 0;
   private tposeWasComplete = false;
+  private wasDiving = false;
 
   private pendingFlap = 0;
 
   reset() {
     this.tposeHeld = 0;
     this.tposeWasComplete = false;
+    this.wasDiving = false;
     this.pendingFlap = 0;
     this.steer = 0;
     this.hasHistory = false;
@@ -77,9 +92,10 @@ export class GestureMapper {
 
   update(landmarks: Landmarks | null, dt: number): GestureState {
     const idle: GestureState = {
-      input: { flap: 0, steer: 0 },
+      input: { flap: 0, steer: 0, dive: 0 },
       tposeProgress: 0,
       tposeComplete: false,
+      diveStarted: false,
       status: "no-pose",
       message: "Step into view",
     };
@@ -87,6 +103,7 @@ export class GestureMapper {
     if (!landmarks || landmarks.length < 25 || dt <= 0) {
       this.tposeHeld = 0;
       this.hasHistory = false;
+      this.wasDiving = false;
       return idle;
     }
 
@@ -102,6 +119,7 @@ export class GestureMapper {
     if (!shouldersSeen) {
       this.tposeHeld = 0;
       this.hasHistory = false;
+      this.wasDiving = false;
       return { ...idle, status: "partial", message: "Show your shoulders" };
     }
 
@@ -147,10 +165,25 @@ export class GestureMapper {
     const tposeComplete = complete && !this.tposeWasComplete;
     this.tposeWasComplete = complete;
 
+    /* ---------------- divebomb: hands brought together ---------------- */
+
+    let dive = 0;
+    if (wristsSeen) {
+      const gap = Math.hypot(lw.x - rw.x, lw.y - rw.y) / unit;
+      // Ramps in over a band rather than switching, so easing the hands
+      // together gives a proportional dive instead of a hard snap.
+      dive = clamp((DIVE_GAP_NONE - gap) / (DIVE_GAP_NONE - DIVE_GAP_FULL), 0, 1);
+    }
+    const isDiving = dive > 0.5;
+    const diveStarted = isDiving && !this.wasDiving;
+    this.wasDiving = isDiving;
+
     /* ---------------- flapping ---------------- */
 
     this.sinceFlap += dt;
-    if (wristsSeen) {
+    // Hands held together travel up and down as one, which would otherwise
+    // read as a perfectly good wingbeat. Diving suppresses flap detection.
+    if (wristsSeen && !isDiving) {
       const wristY = (lw.y + rw.y) / 2;
       if (!this.hasHistory) {
         this.smoothWristY = wristY;
@@ -201,15 +234,19 @@ export class GestureMapper {
     if (isTpose) {
       status = "tpose";
       message = complete ? "Go!" : "Hold it…";
+    } else if (isDiving) {
+      status = "dive";
+      message = "Divebomb!";
     } else if (!wristsSeen) {
       status = "partial";
       message = "Show both hands";
     }
 
     return {
-      input: { flap, steer: this.steer },
+      input: { flap, steer: this.steer, dive },
       tposeProgress,
       tposeComplete,
+      diveStarted,
       status,
       message,
     };

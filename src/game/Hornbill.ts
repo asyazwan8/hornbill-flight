@@ -52,6 +52,7 @@ export class Hornbill {
   private flapPhase = 0;
   private flapEnergy = 0;
   private glide = 0;
+  private tuck = 0;
 
   constructor() {
     // Roll has to come before yaw or the bird banks around the world axis
@@ -223,8 +224,9 @@ export class Hornbill {
    * @param bank    roll angle in radians, from steering
    * @param pitch   pitch angle in radians, from vertical speed
    * @param gliding true when the bird has not flapped recently
+   * @param dive    0..1 divebomb amount, which tucks and sweeps the wings
    */
-  update(dt: number, bank: number, pitch: number, gliding: boolean) {
+  update(dt: number, bank: number, pitch: number, gliding: boolean, dive = 0) {
     // A flap is one cycle of `flapPhase`; energy decays so the wings settle
     // into a glide when the player stops flapping.
     if (this.flapEnergy > 0.001) {
@@ -237,19 +239,28 @@ export class Hornbill {
     }
 
     this.glide = damp(this.glide, gliding ? 1 : 0, 4, dt);
+    this.tuck = damp(this.tuck, dive, 9, dt);
 
     // Idle glide keeps a slow breathing motion so the bird never looks frozen.
     const t = performance.now() * 0.001;
     const idle = Math.sin(t * 1.6) * 0.09 * this.glide;
-    const beat = Math.sin(this.flapPhase) * this.flapEnergy * 0.9;
-    // Positive dihedral raises both wings.
-    const dihedral = 0.15 + idle + beat;
+    // Wing beats fade out as the bird tucks: a diving hornbill is not flapping.
+    const beat = Math.sin(this.flapPhase) * this.flapEnergy * 0.9 * (1 - this.tuck);
+    // Positive dihedral raises both wings; tucking pulls them down and in.
+    const dihedral = 0.15 + idle + beat - this.tuck * 0.75;
 
     this.wingPosX.rotation.z = dihedral;
     this.wingNegX.rotation.z = -dihedral;
-    // Wings sweep back a little at the top of the stroke.
-    this.wingPosX.rotation.y = -beat * 0.14;
-    this.wingNegX.rotation.y = beat * 0.14;
+    // Wings sweep back a little at the top of the stroke, and hard back in a
+    // dive, which is what makes the tucked silhouette read as speed.
+    this.wingPosX.rotation.y = -beat * 0.14 - this.tuck * 1.0;
+    this.wingNegX.rotation.y = beat * 0.14 + this.tuck * 1.0;
+
+    // Draw the wings in toward the body as they sweep, so a dive narrows the
+    // whole silhouette rather than just rotating two planks.
+    const span = 1 - this.tuck * 0.3;
+    this.wingPosX.scale.set(span, 1, 1);
+    this.wingNegX.scale.set(span, 1, 1);
 
     this.group.rotation.z = damp(this.group.rotation.z, bank, 6, dt);
     this.group.rotation.x = damp(this.group.rotation.x, pitch, 5, dt);

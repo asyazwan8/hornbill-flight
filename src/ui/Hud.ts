@@ -6,7 +6,14 @@ const $ = <T extends HTMLElement>(id: string): T => {
   return el as T;
 };
 
-/** All the DOM chrome: score, timer, panels and the pose preview caption. */
+type PanelOptions = {
+  help?: boolean;
+  hint?: string;
+  /** Label for the panel's action button; omitted hides the button. */
+  button?: string;
+};
+
+/** All the DOM chrome: score, timer, panels, buttons and the pose caption. */
 export class Hud {
   private hud = $("hud");
   private timer = $("hud-timer");
@@ -20,11 +27,41 @@ export class Hud {
   private help = $("panel-help");
   private meter = $("tpose-meter");
   private meterFill = $("tpose-meter").querySelector(".meter-fill") as HTMLElement;
+  private button = $<HTMLButtonElement>("primary-btn");
+  private muteButton = $<HTMLButtonElement>("mute");
 
   private preview = $("preview");
   private poseStatus = $("pose-status");
 
   readonly overlayCanvas = $<HTMLCanvasElement>("overlay");
+
+  /** Called when the panel's action button is pressed. */
+  onAction?: () => void;
+  /** Called when the mute toggle changes. */
+  onMuteToggle?: (muted: boolean) => void;
+
+  private muted = false;
+
+  constructor() {
+    this.button.addEventListener("click", () => this.onAction?.());
+
+    this.muteButton.addEventListener("click", () => {
+      this.muted = !this.muted;
+      this.muteButton.textContent = this.muted ? "🔇" : "🔊";
+      this.muteButton.setAttribute("aria-pressed", String(this.muted));
+      this.muteButton.setAttribute("aria-label", this.muted ? "Unmute sound" : "Mute sound");
+      this.onMuteToggle?.(this.muted);
+    });
+
+    // Enter activates whatever the panel is currently offering, so the game is
+    // fully playable without reaching for the mouse.
+    window.addEventListener("keydown", (e) => {
+      if (e.code !== "Enter") return;
+      if (this.button.classList.contains("hidden") || this.button.disabled) return;
+      e.preventDefault();
+      this.onAction?.();
+    });
+  }
 
   showPreview() {
     this.preview.classList.remove("hidden");
@@ -50,35 +87,62 @@ export class Hud {
     this.meterFill.style.width = `${Math.round(progress * 100)}%`;
   }
 
-  private showPanel(title: string, bodyHtml: string, opts: { help?: boolean; hint?: string } = {}) {
+  /** Disable the action button while something is loading behind it. */
+  setButtonBusy(busy: boolean, label?: string) {
+    this.button.disabled = busy;
+    if (label) this.button.textContent = label;
+  }
+
+  private showPanel(title: string, bodyHtml: string, opts: PanelOptions = {}) {
     this.title.textContent = title;
     this.body.innerHTML = bodyHtml;
     this.help.classList.toggle("hidden", !opts.help);
     this.hint.textContent = opts.hint ?? "";
+
+    const hasButton = typeof opts.button === "string";
+    this.button.classList.toggle("hidden", !hasButton);
+    this.button.disabled = false;
+    if (hasButton) this.button.textContent = opts.button as string;
+
     this.panel.classList.remove("hidden");
     this.hud.classList.add("hidden");
   }
 
-  loading(message = "Waking up the camera and the pose model…") {
-    this.showPanel("Hornbill Flight", message);
+  /** The first screen: nothing has been switched on yet. */
+  intro() {
+    this.showPanel(
+      "Hornbill Flight",
+      "You are a hornbill over the rainforest. Collect as many stars as you can in <b>60 seconds</b>, flying with your body.",
+      {
+        help: true,
+        button: "Start",
+        hint: "Uses your webcam and plays sound. Nothing you record ever leaves your device.",
+      }
+    );
+    this.setTposeProgress(0);
   }
 
   error(message: string) {
     this.showPanel("Camera unavailable", message, {
-      hint: "You can still fly with the keyboard: Space to flap, arrow keys to steer, Enter to start.",
+      button: "Play with keyboard",
+      hint: "Space to flap, arrow keys to steer, down arrow to divebomb.",
     });
     this.setTposeProgress(0);
   }
 
+  /** Camera is live and the player can launch. */
   waiting(poseAvailable: boolean) {
     this.showPanel(
-      "Hornbill Flight",
-      "You are a hornbill over the rainforest. Collect as many stars as you can in <b>60 seconds</b>.",
+      "Ready to fly",
+      poseAvailable
+        ? "Stand back so your head, arms and hips are all in frame, then <b>T-pose</b> to launch."
+        : "Press the button below to launch.",
       {
         help: true,
+        button: "Fly now",
         hint: poseAvailable
-          ? "Stand back so your head, arms and hips are all in frame."
-          : "Keyboard: Space to flap, arrow keys to steer, Enter to start.",
+          ? "No room to move? Use the button, or Space to flap and arrow keys to steer."
+          : "Keyboard: Space to flap, arrow keys to steer, down arrow to divebomb.",
       }
     );
   }
@@ -89,14 +153,17 @@ export class Hud {
     this.setTposeProgress(0);
   }
 
-  gameover(score: number, poseAvailable: boolean) {
+  gameover(score: number, best: number) {
     const noun = score === 1 ? "star" : "stars";
-    this.showPanel(
-      "Time!",
-      `<div class="score-big">${score}</div><div>${noun} collected</div>`,
-      {
-        hint: poseAvailable ? "T-pose to fly again." : "Press Enter to fly again.",
-      }
-    );
+    const note =
+      score >= best && score > 0
+        ? "<div class='best'>New best!</div>"
+        : best > 0
+          ? `<div class='best'>Best: ${best}</div>`
+          : "";
+    this.showPanel("Time!", `<div class="score-big">${score}</div><div>${noun} collected</div>${note}`, {
+      button: "Fly again",
+    });
+    this.setTposeProgress(0);
   }
 }

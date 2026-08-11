@@ -20,6 +20,8 @@ type Body = {
   /** How far the wrists reach out from the shoulders. */
   wristReach?: number;
   noseX?: number;
+  /** Put both wrists together in front of the chest, for the dive gesture. */
+  handsTogether?: boolean;
 };
 
 /**
@@ -28,7 +30,24 @@ type Body = {
  * Landmark 11 is the person's LEFT shoulder, which in an unmirrored camera
  * image sits on the right-hand side of the frame.
  */
-function body({ tilt = 0, wristY = 0.4, wristReach = 0.18, noseX = 0.5 }: Body = {}): Landmarks {
+function body({
+  tilt = 0,
+  wristY = 0.4,
+  wristReach = 0.18,
+  noseX = 0.5,
+  handsTogether = false,
+}: Body = {}): Landmarks {
+  if (handsTogether) {
+    // Both wrists meeting in front of the sternum: the divebomb pose.
+    const lm = body({ tilt, wristY, wristReach, noseX });
+    lm[LM.leftWrist] = { x: 0.515, y: wristY, z: 0, visibility: 1 };
+    lm[LM.rightWrist] = { x: 0.485, y: wristY, z: 0, visibility: 1 };
+    return lm;
+  }
+  return squareBody({ tilt, wristY, wristReach, noseX });
+}
+
+function squareBody({ tilt = 0, wristY = 0.4, wristReach = 0.18, noseX = 0.5 }: Body = {}): Landmarks {
   const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 1 }));
 
   lm[LM.nose] = { x: noseX, y: 0.28, z: 0, visibility: 1 };
@@ -140,14 +159,57 @@ function check(name: string, ok: boolean, detail: string) {
   check("standing upright does not steer", Math.abs(upright) < 0.02, `steer=${upright.toFixed(3)}`);
 }
 
+/* ---------------- divebomb ---------------- */
+{
+  const settle = (opts: Body) => {
+    const m = new GestureMapper();
+    let last = m.update(body(opts), DT);
+    for (let i = 0; i < FPS; i++) last = m.update(body(opts), DT);
+    return last;
+  };
+
+  const together = settle({ handsTogether: true, wristY: 0.45 });
+  const apart = settle({ wristY: 0.45, wristReach: 0.2 });
+  const tpose = settle({ wristY: 0.4, wristReach: 0.2 });
+
+  check("hands together triggers a dive", together.input.dive > 0.9, `dive=${together.input.dive.toFixed(2)}`);
+  check("arms apart does not dive", apart.input.dive === 0, `dive=${apart.input.dive.toFixed(2)}`);
+  // The two gestures are geometric opposites, so this should be impossible to
+  // get wrong — but it is the failure that would ruin the game, so assert it.
+  check("a T-pose is never read as a dive", tpose.input.dive === 0, `dive=${tpose.input.dive.toFixed(2)}`);
+  check("dive reports its own status", together.status === "dive", `status=${together.status}`);
+}
+
+{
+  // Hands held together still move up and down as the player shifts; that must
+  // not be mistaken for a wingbeat, or a dive would fight itself.
+  const m = new GestureMapper();
+  let flaps = 0;
+  for (let i = 0; i < FPS * 3; i++) {
+    const wristY = 0.45 + Math.sin(i * DT * Math.PI * 2 * 1.5) * 0.12;
+    if (m.update(body({ handsTogether: true, wristY }), DT).input.flap > 0) flaps++;
+  }
+  check("diving suppresses flap detection", flaps === 0, `flaps=${flaps}`);
+}
+
+{
+  // The whoosh must fire once per dive, not once per frame.
+  const m = new GestureMapper();
+  let starts = 0;
+  for (let i = 0; i < FPS * 2; i++) {
+    if (m.update(body({ handsTogether: true, wristY: 0.45 }), DT).diveStarted) starts++;
+  }
+  check("dive start fires once per dive", starts === 1, `starts=${starts}`);
+}
+
 /* ---------------- robustness ---------------- */
 {
   const m = new GestureMapper();
   const s = m.update(null, DT);
   check(
     "no pose yields neutral controls",
-    s.input.flap === 0 && s.input.steer === 0 && !s.tposeComplete,
-    `flap=${s.input.flap}, steer=${s.input.steer}`
+    s.input.flap === 0 && s.input.steer === 0 && s.input.dive === 0 && !s.tposeComplete,
+    `flap=${s.input.flap}, steer=${s.input.steer}, dive=${s.input.dive}`
   );
 }
 

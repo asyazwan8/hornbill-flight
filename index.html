@@ -26,6 +26,8 @@
         <div id="pose-status">Looking for you…</div>
       </div>
 
+      <button id="mute" class="icon-btn" aria-label="Mute sound" aria-pressed="false">🔊</button>
+
       <!-- Full screen panels -->
       <div id="panel" class="panel">
         <div class="panel-inner">
@@ -33,10 +35,14 @@
           <p id="panel-body">Loading…</p>
           <div id="tpose-meter" class="meter hidden"><div class="meter-fill"></div></div>
           <ul id="panel-help" class="help hidden">
-            <li><b>T-pose</b> — hold both arms straight out to start</li>
             <li><b>Flap</b> — swing both arms down to gain height</li>
             <li><b>Lean</b> — tilt your shoulders left or right to steer</li>
+            <li><b>Hands together</b> — tuck your wings and divebomb</li>
+            <li><b>T-pose</b> — hold both arms straight out to launch</li>
           </ul>
+          <div class="actions">
+            <button id="primary-btn" class="btn hidden">Start</button>
+          </div>
           <p id="panel-hint" class="hint"></p>
         </div>
       </div>

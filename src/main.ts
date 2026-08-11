@@ -4,6 +4,7 @@ import type { FlightInput } from "./game/types";
 import { Hud } from "./ui/Hud";
 import { KeyboardInput } from "./input/Keyboard";
 import { PoseInput } from "./pose/PoseInput";
+import { GameAudio } from "./audio/Audio";
 
 /** Pose and keyboard at the same time; whichever moves, moves the bird. */
 class CombinedInput implements InputSource {
@@ -12,14 +13,16 @@ class CombinedInput implements InputSource {
   sample(dt: number): FlightInput {
     let flap = 0;
     let steer = 0;
+    let dive = 0;
     for (const s of this.sources) {
       const i = s.sample(dt);
       flap = Math.max(flap, i.flap);
+      dive = Math.max(dive, i.dive);
       // The larger deflection wins, so a resting source never cancels an
       // active one.
       if (Math.abs(i.steer) > Math.abs(steer)) steer = i.steer;
     }
-    return { flap, steer };
+    return { flap, steer, dive };
   }
 
   startRequested(): boolean {
@@ -42,38 +45,74 @@ function describeCameraError(err: unknown): string {
   return `The pose model could not start: ${err instanceof Error ? err.message : String(err)}`;
 }
 
+const BEST_KEY = "hornbill-flight:best";
+
+function readBest(): number {
+  const raw = Number(localStorage.getItem(BEST_KEY));
+  return Number.isFinite(raw) && raw > 0 ? raw : 0;
+}
+
 async function main() {
   const canvas = document.getElementById("scene") as HTMLCanvasElement;
   const video = document.getElementById("webcam") as HTMLVideoElement;
   const hud = new Hud();
+  const audio = new GameAudio();
 
   const keyboard = new KeyboardInput();
   let poseInput: PoseInput | null = null;
   let poseAvailable = false;
+  let best = readBest();
+  /** What the action button does right now. */
+  let stage: "intro" | "waiting" | "gameover" = "intro";
 
   const game = new Game(canvas, {
     onScore: (s) => hud.setScore(s),
     onTime: (t) => hud.setTime(t),
+    onCollect: (streak) => audio.star(streak),
     onPhase: (phase) => {
-      if (phase === "waiting") hud.waiting(poseAvailable);
-      else if (phase === "playing") {
+      if (phase === "waiting") {
+        stage = "waiting";
+        hud.waiting(poseAvailable);
+      } else if (phase === "playing") {
+        stage = "waiting";
         hud.playing();
         poseInput?.reset();
-      } else if (phase === "gameover") hud.gameover(game.score, poseAvailable);
+        audio.launch();
+      } else if (phase === "gameover") {
+        stage = "gameover";
+        audio.gameOver();
+        const score = game.score;
+        hud.gameover(score, best);
+        if (score > best) {
+          best = score;
+          try {
+            localStorage.setItem(BEST_KEY, String(best));
+          } catch {
+            // Private browsing can refuse writes; a lost best score is not
+            // worth breaking the game over.
+          }
+        }
+      }
     },
   });
 
   game.setInputSource(new CombinedInput([keyboard]));
   game.run();
 
-  // The camera prompt lands much better after a deliberate click, and some
-  // browsers will not start a webcam without one.
-  hud.loading("Click anywhere to turn on your camera, then stand back and strike a T-pose.");
+  hud.onMuteToggle = (muted) => audio.setMuted(muted);
 
-  const enable = async () => {
-    document.removeEventListener("click", enable);
-    document.removeEventListener("keydown", enable);
-    hud.loading("Starting the camera and loading the pose model…");
+  /** Everything that needs a user gesture: audio unlock, then the camera. */
+  const enableAndStart = async () => {
+    hud.setButtonBusy(true, "Starting…");
+
+    // Audio first: it is instant, and doing it inside the click keeps the
+    // gesture "live" for browsers that require one to unlock playback.
+    try {
+      await audio.init();
+      audio.startMusic();
+    } catch (err) {
+      console.warn("Audio unavailable", err);
+    }
 
     try {
       const pose = new PoseInput(video, hud.overlayCanvas);
@@ -85,21 +124,35 @@ async function main() {
         hud.setPoseStatus(status, message);
         if (game.phase !== "playing") hud.setTposeProgress(progress);
       };
+      pose.onDive = () => audio.dive();
 
       hud.showPreview();
       game.setInputSource(new CombinedInput([pose, keyboard]));
     } catch (err) {
       console.error("Pose setup failed", err);
       hud.error(describeCameraError(err));
-      // Give the player a moment to read it before the menu takes over.
-      await new Promise((r) => setTimeout(r, 4000));
+      stage = "waiting";
+      // Leave the message up; the button now reads "Play with keyboard".
+      game.ready();
+      return;
     }
 
     game.ready();
   };
 
-  document.addEventListener("click", enable);
-  document.addEventListener("keydown", enable);
+  hud.onAction = () => {
+    if (stage === "intro") {
+      void enableAndStart();
+    } else {
+      // Both "Fly now" and "Fly again" launch a run directly. Restarting is
+      // deliberately button-only, so leftover arm positions cannot relaunch.
+      void audio.init();
+      audio.startMusic();
+      game.startRun();
+    }
+  };
+
+  hud.intro();
 }
 
 main();

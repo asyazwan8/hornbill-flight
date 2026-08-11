@@ -23,12 +23,15 @@ export class PoseInput implements InputSource {
   private pendingFlap = 0;
   private startLatched = false;
   private steer = 0;
+  private dive = 0;
 
   status: PoseStatus = "no-pose";
   message = "Step into view";
   tposeProgress = 0;
 
   onUpdate?: (status: PoseStatus, message: string, tposeProgress: number) => void;
+  /** Fired once when a dive begins, so the game can play the whoosh. */
+  onDive?: () => void;
 
   constructor(video: HTMLVideoElement, overlayCanvas: HTMLCanvasElement) {
     this.tracker = new PoseTracker(video);
@@ -55,7 +58,9 @@ export class PoseInput implements InputSource {
     // Latch: hold the flap until the game loop consumes it.
     if (gesture.input.flap > 0) this.pendingFlap = Math.max(this.pendingFlap, gesture.input.flap);
     if (gesture.tposeComplete) this.startLatched = true;
+    if (gesture.diveStarted) this.onDive?.();
     this.steer = gesture.input.steer;
+    this.dive = gesture.input.dive;
 
     this.status = gesture.status;
     this.message = gesture.message;
@@ -68,7 +73,7 @@ export class PoseInput implements InputSource {
   sample(): FlightInput {
     const flap = this.pendingFlap;
     this.pendingFlap = 0;
-    return { flap, steer: this.steer };
+    return { flap, steer: this.steer, dive: this.dive };
   }
 
   startRequested(): boolean {

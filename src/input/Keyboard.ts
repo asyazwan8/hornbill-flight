@@ -5,9 +5,10 @@ import type { FlightInput } from "../game/types";
  * Keyboard controls. Always active alongside the webcam so the game can be
  * developed, demoed and debugged on a machine with no camera.
  *
- *   Space / ArrowUp — flap
- *   Arrows / A,D    — steer
- *   Enter           — start
+ *   Space / ArrowUp    — flap
+ *   Arrows / A,D       — steer
+ *   ArrowDown / S / ⇧  — divebomb
+ *   Enter              — start
  */
 export class KeyboardInput implements InputSource {
   private down = new Set<string>();
@@ -38,9 +39,15 @@ export class KeyboardInput implements InputSource {
     if (this.down.has("ArrowLeft") || this.down.has("KeyA")) steer -= 1;
     if (this.down.has("ArrowRight") || this.down.has("KeyD")) steer += 1;
 
+    const diving =
+      this.down.has("ArrowDown") ||
+      this.down.has("KeyS") ||
+      this.down.has("ShiftLeft") ||
+      this.down.has("ShiftRight");
+
     const flap = this.flapQueued ? 0.85 : 0;
     this.flapQueued = false;
-    return { flap, steer };
+    return { flap, steer, dive: diving ? 1 : 0 };
   }
 
   startRequested(): boolean {
