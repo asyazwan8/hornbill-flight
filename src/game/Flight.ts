@@ -1,11 +1,14 @@
 import * as THREE from "three";
 import { clamp, damp, type FlightInput } from "./types";
 
-const FORWARD_SPEED = 36;
-const GRAVITY = 21;
-const FLAP_IMPULSE = 15;
-const VY_MAX = 23;
-const VY_MIN = -30;
+// Vertical motion is kept gentle on purpose. With a violent climb and dive
+// the bird overshoots every star, because shoulder-steering is nowhere near
+// precise enough to correct a 30 unit/second plunge.
+const FORWARD_SPEED = 32;
+const GRAVITY = 14;
+const FLAP_IMPULSE = 11;
+const VY_MAX = 17;
+const VY_MIN = -22;
 const AIR_DRAG = 0.5;
 
 const TURN_RATE = 1.5; // radians per second at full steer

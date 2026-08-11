@@ -87,6 +87,11 @@ export class Stars {
     scene.add(this.group);
   }
 
+  /** Live star positions. Used by the headless tests and for debugging. */
+  get positions(): readonly THREE.Vector3[] {
+    return this.stars.map((s) => s.position);
+  }
+
   /** Scatter the whole pool ahead of the bird for a fresh run. */
   reset(birdPos: THREE.Vector3, heading: number) {
     for (let i = 0; i < this.stars.length; i++) {
