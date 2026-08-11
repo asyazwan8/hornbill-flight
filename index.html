@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Hornbill Flight</title>
+    <meta name="description" content="Fly a low-poly hornbill with your body. T-pose to start, flap to fly, lean to steer." />
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <!-- Webcam feed. Kept in the DOM (not display:none) so the browser keeps
+         decoding frames for MediaPipe, but visually replaced by the preview. -->
+    <video id="webcam" playsinline autoplay muted></video>
+
+    <div id="ui">
+      <!-- Heads up display, visible while flying -->
+      <div id="hud" class="hidden">
+        <div class="hud-stat" id="hud-timer"><span class="label">TIME</span><span class="value">60</span></div>
+        <div class="hud-stat" id="hud-score"><span class="label">STARS</span><span class="value">0</span></div>
+      </div>
+
+      <!-- Pose preview with skeleton overlay -->
+      <div id="preview" class="hidden">
+        <canvas id="overlay"></canvas>
+        <div id="pose-status">Looking for you…</div>
+      </div>
+
+      <!-- Full screen panels -->
+      <div id="panel" class="panel">
+        <div class="panel-inner">
+          <h1 id="panel-title">Hornbill Flight</h1>
+          <p id="panel-body">Loading…</p>
+          <div id="tpose-meter" class="meter hidden"><div class="meter-fill"></div></div>
+          <ul id="panel-help" class="help hidden">
+            <li><b>T-pose</b> — hold both arms straight out to start</li>
+            <li><b>Flap</b> — swing both arms down to gain height</li>
+            <li><b>Lean</b> — tilt your shoulders left or right to steer</li>
+          </ul>
+          <p id="panel-hint" class="hint"></p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

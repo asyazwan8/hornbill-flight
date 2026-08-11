@@ -1,0 +1,30 @@
+{
+  "name": "hornbill-flight",
+  "version": "1.0.0",
+  "description": "Fly a low-poly hornbill with your body. Webcam pose control, 60 seconds, collect the stars.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "threejs",
+    "mediapipe",
+    "pose",
+    "game",
+    "webcam"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1"
+  }
+}

@@ -1,0 +1,237 @@
+:root {
+  --ink: #0b1020;
+  --paper: #f7f4ec;
+  --gold: #ffcc44;
+  --sun: #ffb03a;
+  --leaf: #3f7d4e;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  --font: "Trebuchet MS", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1020;
+  font-family: var(--font);
+  color: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The raw webcam element never needs to be seen; the preview canvas draws it. */
+#webcam {
+  position: fixed;
+  width: 2px;
+  height: 2px;
+  opacity: 0.001;
+  pointer-events: none;
+  top: 0;
+  left: 0;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------------- HUD ---------------- */
+
+#hud {
+  position: absolute;
+  top: 22px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+
+.hud-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 118px;
+  padding: 10px 20px 12px;
+  border-radius: 16px;
+  background: rgba(11, 16, 32, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+}
+
+.hud-stat .label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  opacity: 0.7;
+}
+
+.hud-stat .value {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+#hud-score .value {
+  color: var(--gold);
+}
+
+#hud-timer.urgent .value {
+  color: #ff6b5e;
+  animation: pulse 0.7s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+/* ---------------- Pose preview ---------------- */
+
+#preview {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  width: 216px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(11, 16, 32, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: var(--shadow);
+}
+
+#overlay {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+#pose-status {
+  padding: 6px 10px 7px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+#pose-status.good {
+  color: #8ce99a;
+}
+
+#pose-status.warn {
+  color: #ffd43b;
+}
+
+/* ---------------- Panels ---------------- */
+
+.panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(ellipse at center, rgba(9, 14, 30, 0.72), rgba(6, 9, 20, 0.94));
+  pointer-events: auto;
+  transition: opacity 0.35s ease;
+}
+
+.panel.hidden {
+  display: none !important;
+}
+
+.panel-inner {
+  width: min(560px, 100%);
+  text-align: center;
+}
+
+.panel h1 {
+  margin: 0 0 10px;
+  font-size: clamp(34px, 7vw, 60px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  background: linear-gradient(180deg, #fff8e6, var(--sun));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.panel p {
+  margin: 0 auto;
+  max-width: 46ch;
+  font-size: 16px;
+  line-height: 1.55;
+  opacity: 0.88;
+}
+
+.panel .hint {
+  margin-top: 20px;
+  font-size: 13px;
+  opacity: 0.55;
+}
+
+.help {
+  list-style: none;
+  margin: 24px auto 0;
+  padding: 0;
+  max-width: 400px;
+  text-align: left;
+}
+
+.help li {
+  padding: 9px 14px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.help b {
+  color: var(--gold);
+}
+
+/* T-pose hold meter */
+.meter {
+  width: min(320px, 80%);
+  height: 8px;
+  margin: 26px auto 0;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--leaf), var(--gold));
+  transition: width 0.08s linear;
+}
+
+.score-big {
+  font-size: 78px;
+  font-weight: 800;
+  color: var(--gold);
+  line-height: 1;
+  margin: 6px 0 2px;
+}
