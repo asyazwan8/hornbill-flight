@@ -5,6 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/fetch-assets.mjs",
+    "assets": "node scripts/fetch-assets.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

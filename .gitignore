@@ -3,3 +3,9 @@ dist
 .DS_Store
 *.local
 .vercel
+.env.production
+
+# Staged by scripts/fetch-assets.mjs on npm install. ~17MB of MediaPipe
+# runtime and model that does not belong in git.
+public/mediapipe/
+public/models/

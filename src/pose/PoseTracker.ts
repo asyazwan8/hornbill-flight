@@ -16,6 +16,17 @@ export const LM = {
 export type Landmarks = NormalizedLandmark[];
 
 /**
+ * Where the MediaPipe runtime and the pose model are loaded from.
+ *
+ * By default both come from this app's own /public directory: no CDN, and the
+ * game keeps working offline after first load. Hosts that would rather not
+ * serve ~17MB of static assets can point these at the official CDN instead by
+ * setting VITE_MEDIAPIPE_WASM and VITE_POSE_MODEL at build time.
+ */
+const WASM_BASE = import.meta.env.VITE_MEDIAPIPE_WASM ?? "/mediapipe/wasm";
+const MODEL_URL = import.meta.env.VITE_POSE_MODEL ?? "/models/pose_landmarker_lite.task";
+
+/**
  * Owns the webcam and the MediaPipe pose model.
  *
  * Both the wasm runtime and the model file are served from this app's own
@@ -43,11 +54,11 @@ export class PoseTracker {
   }
 
   async init(): Promise<void> {
-    const fileset = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+    const fileset = await FilesetResolver.forVisionTasks(WASM_BASE);
 
     this.landmarker = await PoseLandmarker.createFromOptions(fileset, {
       baseOptions: {
-        modelAssetPath: "/models/pose_landmarker_lite.task",
+        modelAssetPath: MODEL_URL,
         delegate: "GPU",
       },
       runningMode: "VIDEO",
