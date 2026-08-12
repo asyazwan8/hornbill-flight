@@ -1,9 +1,16 @@
 /**
- * All game audio, synthesised in the browser with Web Audio.
+ * All game audio, played through Web Audio.
  *
- * Nothing is loaded from a file: the star chime, the dive whoosh and the
- * background music are all generated from oscillators and noise. That keeps
- * the repository free of binary assets, exactly like the 3D models.
+ * Almost everything is synthesised: the star chime, the dive whoosh and the
+ * background music are generated from oscillators and noise, which keeps the
+ * repository free of binary assets, exactly like the 3D models.
+ *
+ * The one exception is the hornbill call. A synthesised bark never sounded
+ * like the real bird — the species calls around 900Hz with a hard attack and a
+ * long forest tail, which oscillators approximate badly — so `SAMPLES.call`
+ * holds a 9KB recording of an actual rhinoceros hornbill. It loads in the
+ * background and the synthesised version stays as the fallback, so the game
+ * still makes the right noises if the fetch fails.
  *
  * Browsers refuse to start an AudioContext without a user gesture, so `init()`
  * must be called from a click — the Start button does that.
@@ -34,6 +41,18 @@ const ARP_POOL: number[][] = [
 /** Which pool note to play on each eighth; -1 is a rest, so the loop breathes. */
 const ARP_PATTERN = [0, -1, 2, 1, -1, 3, 2, -1];
 
+/** Recorded clips, served from `public/`. Everything else is synthesised. */
+const CALL_URL = "/audio/hornbill-call.mp3";
+
+/**
+ * Rhinoceros hornbills honk in short series rather than once, so a call plays
+ * the clip a few times with a gap slightly longer than the clip's own tail.
+ */
+const CALL_MIN_HONKS = 1;
+const CALL_MAX_HONKS = 3;
+const CALL_GAP_MIN = 0.52;
+const CALL_GAP_MAX = 0.78;
+
 export class GameAudio {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -41,6 +60,8 @@ export class GameAudio {
   private sfxBus!: GainNode;
 
   private noise: AudioBuffer | null = null;
+  private callBuffer: AudioBuffer | null = null;
+  private callLoad: Promise<void> | null = null;
 
   private schedulerId: number | null = null;
   private nextStepTime = 0;
@@ -83,6 +104,29 @@ export class GameAudio {
     this.sfxBus.connect(this.master);
 
     if (ctx.state === "suspended") await ctx.resume();
+
+    // Deliberately not awaited: 9KB decodes in a few frames, and the first
+    // call is at least seven seconds into a run, so there is no reason to hold
+    // up the Start button for it.
+    void this.loadCall();
+  }
+
+  /** Fetch and decode the recorded call. Failure is not fatal — see `call()`. */
+  private loadCall(): Promise<void> {
+    if (this.callLoad) return this.callLoad;
+    const ctx = this.ctx;
+    if (!ctx) return Promise.resolve();
+
+    this.callLoad = (async () => {
+      try {
+        const res = await fetch(CALL_URL);
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        this.callBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
+      } catch (err) {
+        console.warn("Hornbill call sample unavailable, using the synth:", err);
+      }
+    })();
+    return this.callLoad;
   }
 
   setMuted(muted: boolean) {
@@ -160,13 +204,47 @@ export class GameAudio {
   }
 
   /**
-   * A hornbill call: the loud nasal double honk the bird is named for.
+   * A hornbill call: the loud nasal honk the bird is named for.
+   *
+   * Uses the recording when it has loaded. Each honk is detuned a little and
+   * the series tapers off, so a repeated call does not sound like a loop.
+   */
+  call() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (!this.callBuffer) {
+      this.synthCall();
+      return;
+    }
+
+    const t0 = ctx.currentTime;
+    const honks = CALL_MIN_HONKS + Math.floor(Math.random() * (CALL_MAX_HONKS - CALL_MIN_HONKS + 1));
+    let at = t0;
+
+    for (let i = 0; i < honks; i++) {
+      const src = ctx.createBufferSource();
+      src.buffer = this.callBuffer;
+      // A few percent of detune reads as the same bird, not a different one.
+      src.playbackRate.value = 0.96 + Math.random() * 0.08;
+
+      const gain = ctx.createGain();
+      gain.gain.value = 0.9 * Math.pow(0.86, i);
+
+      src.connect(gain).connect(this.sfxBus);
+      src.start(at);
+
+      at += CALL_GAP_MIN + Math.random() * (CALL_GAP_MAX - CALL_GAP_MIN);
+    }
+  }
+
+  /**
+   * Fallback call, used only until the recording loads or if it never does.
    *
    * Sawtooth through a resonant bandpass gives the hollow, reedy quality; the
    * fast downward pitch bend on each bark is what makes it read as a call
    * rather than a beep.
    */
-  call() {
+  private synthCall() {
     const ctx = this.ctx;
     if (!ctx) return;
     const t0 = ctx.currentTime;
