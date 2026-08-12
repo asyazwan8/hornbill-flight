@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { World, FOG_COLOR } from "./World";
 import { Hornbill } from "./Hornbill";
 import { Stars } from "./Stars";
-import { Flight } from "./Flight";
+import { Flight, GROUND_Y } from "./Flight";
 import { NO_INPUT, damp, type FlightInput, type GamePhase } from "./types";
 
 export const ROUND_SECONDS = 60;
@@ -14,19 +14,55 @@ export interface InputSource {
   startRequested(): boolean;
 }
 
+/** Where the aiming reticle should be drawn, in screen pixels. */
+export type Reticle = {
+  x: number;
+  y: number;
+  visible: boolean;
+  /** True when holding this course actually runs the bird through a star. */
+  locked: boolean;
+};
+
 export type GameEvents = {
   onPhase?: (phase: GamePhase) => void;
   onScore?: (score: number) => void;
   onTime?: (secondsLeft: number) => void;
   /** A star was picked up. `streak` counts stars collected in quick succession. */
   onCollect?: (streak: number) => void;
+  /** A wingbeat actually took effect, 0..1 strength. */
+  onFlap?: (strength: number) => void;
+  /** Bonus time awarded, in seconds. */
+  onBonus?: (seconds: number) => void;
+  /** The bird flew into something. */
+  onCrash?: () => void;
+  /** The hornbill calls now and then while flying. */
+  onCall?: () => void;
+  onReticle?: (reticle: Reticle) => void;
 };
 
 /** Collect another star within this many seconds and the streak keeps building. */
 const STREAK_WINDOW = 2.5;
 
+/** Collect this many stars and the clock is extended. */
+export const STARS_PER_BONUS = 3;
+export const BONUS_SECONDS = 10;
+
 const FOV_NORMAL = 62;
 const FOV_DIVE = 78;
+
+/** Collision sphere for the bird. The body, not the full wingspan: clipping a
+ *  tree with a wingtip would end runs that visually looked fine. */
+const BIRD_RADIUS = 3.4;
+
+/** How far ahead the aiming reticle projects, and at what resolution. */
+const AIM_SECONDS = 1.6;
+const AIM_SAMPLES = 16;
+
+const CALL_MIN_GAP = 7;
+const CALL_MAX_GAP = 17;
+
+/** Slightly wider than the pickup radius, so the lock leads the catch. */
+const STAR_LOCK_RADIUS = 10;
 
 export class Game {
   readonly scene = new THREE.Scene();
@@ -53,6 +89,14 @@ export class Game {
 
   private streak = 0;
   private sinceCollect = 99;
+  /** Stars collected since the last time bonus was awarded. */
+  private towardBonus = 0;
+  private untilCall = 4;
+  /** Set when the run ended by flying into something rather than running out. */
+  crashed = false;
+
+  private aimPath: THREE.Vector3[] = [];
+  private aimPoint = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement, events: GameEvents = {}) {
     this.events = events;
@@ -78,6 +122,14 @@ export class Game {
     this.input = input;
   }
 
+  /**
+   * Read-only handles for dev tooling and the browser tests, which drive the
+   * real game with a scripted autopilot rather than mashing keys and hoping.
+   */
+  get debug() {
+    return { flight: this.flight, stars: this.stars, world: this.world };
+  }
+
   private setPhase(phase: GamePhase) {
     if (this.phase === phase) return;
     this.phase = phase;
@@ -95,6 +147,9 @@ export class Game {
     this.lastWholeSecond = ROUND_SECONDS;
     this.streak = 0;
     this.sinceCollect = 99;
+    this.towardBonus = 0;
+    this.untilCall = 4;
+    this.crashed = false;
     this.flight.reset();
     this.stars.reset(this.flight.position, this.flight.heading);
     this.placeCameraBehindBird(true);
@@ -103,7 +158,9 @@ export class Game {
     this.setPhase("playing");
   }
 
-  private endRun() {
+  private endRun(crashed = false) {
+    this.crashed = crashed;
+    if (crashed) this.events.onCrash?.();
     this.setPhase("gameover");
   }
 
@@ -173,7 +230,12 @@ export class Game {
     } else if (this.phase === "playing") {
       const input: FlightInput = this.input ? this.input.sample(dt) : NO_INPUT;
       const flapped = this.flight.update(dt, input);
-      if (flapped > 0) this.bird.onFlap(flapped);
+      if (flapped > 0) {
+        this.bird.onFlap(flapped);
+        // Fired from here, not from the input layer, so a flap swallowed
+        // mid-dive stays silent as well as inert.
+        this.events.onFlap?.(flapped);
+      }
 
       this.sinceCollect += dt;
       const got = this.stars.update(dt, this.flight.position, this.flight.heading);
@@ -183,6 +245,29 @@ export class Game {
         this.sinceCollect = 0;
         this.events.onScore?.(this.score);
         this.events.onCollect?.(this.streak);
+
+        // Every few stars buys more time, which is what turns a fixed minute
+        // into a run that good flying can keep alive.
+        this.towardBonus += got;
+        while (this.towardBonus >= STARS_PER_BONUS) {
+          this.towardBonus -= STARS_PER_BONUS;
+          this.timeLeft += BONUS_SECONDS;
+          this.events.onBonus?.(BONUS_SECONDS);
+        }
+      }
+
+      // Flying into the canopy ends the run and stops the clock.
+      if (
+        this.flight.position.y <= GROUND_Y + 1 ||
+        this.world.hitsTree(this.flight.position, BIRD_RADIUS)
+      ) {
+        this.endRun(true);
+      }
+
+      this.untilCall -= dt;
+      if (this.untilCall <= 0) {
+        this.untilCall = CALL_MIN_GAP + Math.random() * (CALL_MAX_GAP - CALL_MIN_GAP);
+        this.events.onCall?.();
       }
 
       this.timeLeft = Math.max(0, this.timeLeft - elapsed);
@@ -211,7 +296,49 @@ export class Game {
 
     this.placeCameraBehindBird(false, dt);
     this.renderer.render(this.scene, this.camera);
+
+    // The reticle is projected after the camera has settled for this frame,
+    // or it would trail the view by one frame and never quite line up.
+    if (this.phase === "playing") this.updateReticle();
   };
+
+  /**
+   * Project the bird's real predicted flight path to screen space.
+   *
+   * The path comes from the flight model itself, and the projection uses the
+   * same camera that just rendered the frame, so the cross marks exactly where
+   * the bird is going — no separate approximation to drift out of sync.
+   */
+  private updateReticle() {
+    if (!this.events.onReticle) return;
+
+    const path = this.flight.predictPath(AIM_SECONDS, AIM_SAMPLES, this.aimPath);
+    const target = path[path.length - 1];
+
+    // Locked when the predicted path would actually pass through a star.
+    let locked = false;
+    const stars = this.stars.positions;
+    outer: for (const point of path) {
+      for (const star of stars) {
+        if (point.distanceToSquared(star) < STAR_LOCK_RADIUS * STAR_LOCK_RADIUS) {
+          locked = true;
+          break outer;
+        }
+      }
+    }
+
+    this.aimPoint.copy(target).project(this.camera);
+    // z beyond 1 means the point sits behind the camera, where the projection
+    // flips and would put the cross on the wrong side of the screen.
+    const visible = this.aimPoint.z < 1;
+
+    this.events.onReticle({
+      x: (this.aimPoint.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-this.aimPoint.y * 0.5 + 0.5) * window.innerHeight,
+      visible,
+      locked,
+    });
+  }
 
   /** Keeps the idle bird aloft without any player input. */
   private idleTimer = 0;

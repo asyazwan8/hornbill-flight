@@ -127,6 +127,130 @@ export class GameAudio {
     }
   }
 
+  /**
+   * One wingbeat. Fires over a wingbeat a second, so it is deliberately quiet
+   * and short — at full volume it would become a rattle within seconds.
+   */
+  flap(strength = 1) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.getNoise();
+    src.playbackRate.value = 0.8 + Math.random() * 0.3;
+
+    // Low-passed noise sweeping down reads as a soft push of air rather than
+    // a hiss.
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(1100, t);
+    filter.frequency.exponentialRampToValueAtTime(280, t + 0.22);
+    filter.Q.value = 0.9;
+
+    const gain = ctx.createGain();
+    const level = 0.1 + strength * 0.1;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(level, t + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+
+    src.connect(filter).connect(gain).connect(this.sfxBus);
+    src.start(t);
+    src.stop(t + 0.3);
+  }
+
+  /**
+   * A hornbill call: the loud nasal double honk the bird is named for.
+   *
+   * Sawtooth through a resonant bandpass gives the hollow, reedy quality; the
+   * fast downward pitch bend on each bark is what makes it read as a call
+   * rather than a beep.
+   */
+  call() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const barks = 2 + Math.floor(Math.random() * 2);
+
+    for (let i = 0; i < barks; i++) {
+      const at = t0 + i * (0.19 + Math.random() * 0.05);
+      const root = 300 + Math.random() * 60;
+
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(root * 1.5, at);
+      osc.frequency.exponentialRampToValueAtTime(root, at + 0.07);
+
+      const band = ctx.createBiquadFilter();
+      band.type = "bandpass";
+      band.frequency.setValueAtTime(950, at);
+      band.frequency.exponentialRampToValueAtTime(620, at + 0.12);
+      band.Q.value = 4.5;
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.3, at + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+
+      osc.connect(band).connect(gain).connect(this.sfxBus);
+      osc.start(at);
+      osc.stop(at + 0.18);
+    }
+  }
+
+  /** Bonus time awarded. Bright and rising, clearly a good thing. */
+  bonus() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [79, 84, 88].forEach((midi, i) => {
+      const at = t + i * 0.075;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq(midi), at);
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.4, at + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.4);
+      osc.connect(gain).connect(this.sfxBus);
+      osc.start(at);
+      osc.stop(at + 0.42);
+    });
+  }
+
+  /** Flying into a tree. A dull thud, not a musical note. */
+  crash() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.getNoise();
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(900, t);
+    filter.frequency.exponentialRampToValueAtTime(120, t + 0.45);
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.7, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    src.connect(filter).connect(noiseGain).connect(this.sfxBus);
+    src.start(t);
+    src.stop(t + 0.55);
+
+    // A low body under the impact so it lands with some weight.
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(45, t + 0.35);
+    oscGain.gain.setValueAtTime(0.5, t);
+    oscGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    osc.connect(oscGain).connect(this.sfxBus);
+    osc.start(t);
+    osc.stop(t + 0.5);
+  }
+
   /** Air rushing past as the bird tucks in and drops. */
   dive() {
     const ctx = this.ctx;

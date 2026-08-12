@@ -29,6 +29,8 @@ export class Hud {
   private meterFill = $("tpose-meter").querySelector(".meter-fill") as HTMLElement;
   private button = $<HTMLButtonElement>("primary-btn");
   private muteButton = $<HTMLButtonElement>("mute");
+  private reticle = $("reticle");
+  private bonus = $("bonus");
 
   private preview = $("preview");
   private poseStatus = $("pose-status");
@@ -74,6 +76,26 @@ export class Hud {
   setTime(seconds: number) {
     this.timerValue.textContent = String(seconds);
     this.timer.classList.toggle("urgent", seconds <= 10);
+  }
+
+  /** Move the aiming cross to a projected screen position. */
+  setReticle(x: number, y: number, visible: boolean, locked: boolean) {
+    this.reticle.classList.toggle("hidden", !visible);
+    if (!visible) return;
+    this.reticle.style.transform = `translate(${x}px, ${y}px)`;
+    this.reticle.classList.toggle("locked", locked);
+  }
+
+  hideReticle() {
+    this.reticle.classList.add("hidden");
+  }
+
+  /** Flash the bonus time award. Restarting the animation needs a reflow. */
+  flashBonus(seconds: number) {
+    this.bonus.textContent = `+${seconds}s`;
+    this.bonus.classList.remove("show");
+    void this.bonus.offsetWidth;
+    this.bonus.classList.add("show");
   }
 
   setPoseStatus(status: PoseStatus, message: string) {
@@ -153,7 +175,7 @@ export class Hud {
     this.setTposeProgress(0);
   }
 
-  gameover(score: number, best: number) {
+  gameover(score: number, best: number, crashed: boolean) {
     const noun = score === 1 ? "star" : "stars";
     const note =
       score >= best && score > 0
@@ -161,9 +183,15 @@ export class Hud {
         : best > 0
           ? `<div class='best'>Best: ${best}</div>`
           : "";
-    this.showPanel("Time!", `<div class="score-big">${score}</div><div>${noun} collected</div>${note}`, {
-      button: "Fly again",
-    });
+    this.showPanel(
+      crashed ? "Crashed!" : "Time!",
+      `<div class="score-big">${score}</div><div>${noun} collected</div>${note}`,
+      {
+        button: "Fly again",
+        hint: crashed ? "You flew into the canopy. Keep flapping to stay above the trees." : "",
+      }
+    );
     this.setTposeProgress(0);
+    this.hideReticle();
   }
 }

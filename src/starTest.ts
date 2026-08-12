@@ -9,7 +9,8 @@
  */
 import * as THREE from "three";
 import { Stars } from "./game/Stars";
-import { Flight } from "./game/Flight";
+import { Flight, GROUND_Y, START_ALTITUDE } from "./game/Flight";
+import { World } from "./game/World";
 import { ROUND_SECONDS } from "./game/Game";
 import { clamp } from "./game/types";
 
@@ -31,7 +32,7 @@ const newStars = () => new Stars(new THREE.Scene());
 /* ---------------- collection ---------------- */
 {
   const stars = newStars();
-  const bird = new THREE.Vector3(0, 90, 0);
+  const bird = new THREE.Vector3(0, START_ALTITUDE, 0);
   stars.reset(bird, heading);
 
   const target = stars.positions[0].clone();
@@ -41,7 +42,7 @@ const newStars = () => new Stars(new THREE.Scene());
 
 {
   const stars = newStars();
-  const bird = new THREE.Vector3(0, 90, 0);
+  const bird = new THREE.Vector3(0, START_ALTITUDE, 0);
   stars.reset(bird, heading);
   // Sit 20 units off a star: outside the 8 unit pickup radius.
   const near = stars.positions[0].clone().add(new THREE.Vector3(20, 0, 0));
@@ -51,7 +52,7 @@ const newStars = () => new Stars(new THREE.Scene());
 
 {
   const stars = newStars();
-  const bird = new THREE.Vector3(0, 90, 0);
+  const bird = new THREE.Vector3(0, START_ALTITUDE, 0);
   stars.reset(bird, heading);
   const before = stars.positions[0].clone();
   stars.update(1 / 60, before.clone(), heading);
@@ -65,7 +66,7 @@ const newStars = () => new Stars(new THREE.Scene());
   const stars = newStars();
   // A player pinned at the ceiling must still have reachable stars: this is
   // the bug where every star spawned in a fixed band far below.
-  const high = new THREE.Vector3(0, 200, 0);
+  const high = new THREE.Vector3(0, 125, 0);
   stars.reset(high, heading);
   const gaps = stars.positions.map((p) => Math.abs(p.y - high.y));
   const worst = Math.max(...gaps);
@@ -75,10 +76,10 @@ const newStars = () => new Stars(new THREE.Scene());
 /* ---------------- recycling ---------------- */
 {
   const stars = newStars();
-  const bird = new THREE.Vector3(0, 90, 0);
+  const bird = new THREE.Vector3(0, START_ALTITUDE, 0);
   stars.reset(bird, heading);
   // Fly a long way past every star; none should be left stranded behind.
-  const far = new THREE.Vector3(0, 90, 1200);
+  const far = new THREE.Vector3(0, START_ALTITUDE, 1200);
   stars.update(1 / 60, far, heading);
   const behind = stars.positions.filter((p) => p.z < far.z - 95).length;
   check("stars left behind are recycled", behind === 0, `${behind} stranded`);
@@ -136,7 +137,9 @@ const newStars = () => new Stars(new THREE.Scene());
     const steer = clamp(-diff * 2, -1, 1);
 
     sinceFlap += DT;
-    const wantsHeight = nearest.y > flight.position.y - 4;
+    // There is no safety floor any more, so the autopilot has to keep itself
+    // up the way a player does: flap for the target, and flap to survive.
+    const wantsHeight = nearest.y > flight.position.y - 4 || flight.position.y < 45;
     const flap = wantsHeight && sinceFlap > 0.25 && flight.vy < 8 ? 0.9 : 0;
     if (flap > 0) sinceFlap = 0;
 
@@ -163,7 +166,7 @@ const newStars = () => new Stars(new THREE.Scene());
     const startZ = flight.position.z;
     const DT = 1 / 60;
     for (let i = 0; i < seconds / DT; i++) flight.update(DT, { flap: 0, steer: 0, dive });
-    return { drop: 90 - flight.position.y, travelled: flight.position.z - startZ };
+    return { drop: START_ALTITUDE - flight.position.y, travelled: flight.position.z - startZ };
   };
 
   const glide = run(0, 1.5);
@@ -182,7 +185,8 @@ const newStars = () => new Stars(new THREE.Scene());
 }
 
 {
-  // A dive must not punch through the floor and out of the world.
+  // The bird may now reach the ground — that is the whole hazard — but it must
+  // never fall through the world.
   const flight = new Flight();
   flight.reset();
   const DT = 1 / 60;
@@ -191,7 +195,116 @@ const newStars = () => new Stars(new THREE.Scene());
     flight.update(DT, { flap: 0, steer: 0, dive: 1 });
     lowest = Math.min(lowest, flight.position.y);
   }
-  check("a sustained dive stays above the canopy", lowest > 20, `lowest altitude ${lowest.toFixed(1)}`);
+  check(
+    "the ground is a hard floor",
+    lowest >= GROUND_Y - 0.001 && lowest < GROUND_Y + 1,
+    `lowest altitude ${lowest.toFixed(2)}, floor ${GROUND_Y}`
+  );
+}
+
+/* ---------------- sink and lift ---------------- */
+{
+  // Feature: the bird drifts down on its own and you flap to climb.
+  const glide = new Flight();
+  glide.reset();
+  const DT = 1 / 60;
+  for (let i = 0; i < 3 / DT; i++) glide.update(DT, { flap: 0, steer: 0, dive: 0 });
+  const sank = START_ALTITUDE - glide.position.y;
+  const rate = -glide.vy;
+
+  check(
+    "the bird sinks steadily when left alone",
+    sank > 15 && sank < 60,
+    `sank ${sank.toFixed(0)} units in 3s, settling at ${rate.toFixed(1)} units/s`
+  );
+  check(
+    "the sink settles rather than accelerating",
+    rate < 16,
+    `terminal sink ${rate.toFixed(1)} units/s`
+  );
+}
+
+{
+  // Flapping at a realistic human cadence must actually hold you up.
+  const flight = new Flight();
+  flight.reset();
+  const DT = 1 / 60;
+  let sinceFlap = 0;
+  for (let i = 0; i < 10 / DT; i++) {
+    sinceFlap += DT;
+    let flap = 0;
+    if (sinceFlap >= 0.75) {
+      flap = 0.85;
+      sinceFlap = 0;
+    }
+    flight.update(DT, { flap, steer: 0, dive: 0 });
+  }
+  check(
+    "flapping about 1.3x a second holds altitude",
+    flight.position.y > START_ALTITUDE - 5,
+    `after 10s at ${flight.position.y.toFixed(0)} (started ${START_ALTITUDE})`
+  );
+}
+
+/* ---------------- the aiming reticle ---------------- */
+{
+  // The crosshair is only worth drawing if it is truthful, so assert that the
+  // predicted path is where the bird actually ends up.
+  const flight = new Flight();
+  flight.reset();
+  const DT = 1 / 60;
+  // Get it into a non-trivial state first: climbing, turning.
+  for (let i = 0; i < 40; i++) flight.update(DT, { flap: i === 0 ? 1 : 0, steer: 0.6, dive: 0 });
+
+  const predicted = flight.predictPath(1.5, 24);
+  const end = predicted[predicted.length - 1].clone();
+
+  // Now actually fly the same 1.5 seconds with the same held input.
+  const steps = Math.round(1.5 / (1.5 / 24));
+  for (let i = 0; i < steps; i++) flight.update(1.5 / 24, { flap: 0, steer: 0.6, dive: 0 });
+
+  const error = end.distanceTo(flight.position);
+  check(
+    "the reticle path matches where the bird really goes",
+    error < 0.5,
+    `predicted vs actual differ by ${error.toFixed(3)} units`
+  );
+}
+
+/* ---------------- tree collision ---------------- */
+{
+  const world = new World(new THREE.Scene());
+
+  // High above everything is always safe.
+  const high = new THREE.Vector3(0, 200, 0);
+  check("nothing is hit high above the canopy", !world.hitsTree(high, 3.4), "clear at y=200");
+
+  // Down at trunk height in a 900-tree forest, something must be hit
+  // somewhere: sweep the tile and make sure collisions actually register.
+  let hits = 0;
+  const probe = new THREE.Vector3();
+  for (let x = -300; x <= 300; x += 7) {
+    for (let z = -300; z <= 300; z += 7) {
+      probe.set(x, 12, z);
+      if (world.hitsTree(probe, 3.4)) hits++;
+    }
+  }
+  check("trees are solid at canopy height", hits > 50, `${hits} colliding probe points`);
+
+  // The cone must taper: the same spot at the very top of the canopy should
+  // collide far less often than down in the thick of it.
+  let highHits = 0;
+  for (let x = -300; x <= 300; x += 7) {
+    for (let z = -300; z <= 300; z += 7) {
+      probe.set(x, 29, z);
+      if (world.hitsTree(probe, 3.4)) highHits++;
+    }
+  }
+  check(
+    "crowns taper toward the tip",
+    highHits < hits,
+    `${highHits} hits at the treetops vs ${hits} lower down`
+  );
 }
 
 {

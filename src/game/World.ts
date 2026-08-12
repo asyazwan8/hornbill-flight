@@ -5,6 +5,17 @@ import * as THREE from "three";
 const TILE = 620;
 const TREE_COUNT = 900;
 
+/**
+ * Crown geometry, kept here so collision and rendering cannot disagree.
+ * ConeGeometry(5.2, 16) is centred, then translated +16, so in local space the
+ * crown runs from y=8 up to a point at y=24 with a base radius of 5.2. Every
+ * instance is then scaled and dropped to y=-2.
+ */
+const CROWN_RADIUS = 5.2;
+const CROWN_BASE_Y = 8;
+const CROWN_APEX_Y = 24;
+const TREE_BASE_OFFSET = -2;
+
 const SKY_TOP = new THREE.Color("#2a6bc4");
 const SKY_BOTTOM = new THREE.Color("#cbe8f7");
 /** Matches the bottom of the sky gradient, so the horizon dissolves instead of
@@ -39,6 +50,13 @@ export class World {
   private wrapX: Int16Array = new Int16Array(TREE_COUNT);
   private wrapZ: Int16Array = new Int16Array(TREE_COUNT);
   private dummy = new THREE.Object3D();
+
+  /** Live collision shape for each tree, kept in step with the matrices. */
+  private treeX = new Float32Array(TREE_COUNT);
+  private treeZ = new Float32Array(TREE_COUNT);
+  private treeApex = new Float32Array(TREE_COUNT);
+  private treeCrownBase = new Float32Array(TREE_COUNT);
+  private treeRadius = new Float32Array(TREE_COUNT);
 
   constructor(scene: THREE.Scene) {
     scene.fog = new THREE.Fog(FOG_COLOR, 320, 1150);
@@ -186,12 +204,23 @@ export class World {
       dirty = true;
 
       const s = this.treeScale[i];
-      this.dummy.position.set(base.x + wx * span, -2, base.z + wz * span);
-      this.dummy.scale.set(s, s * (0.85 + (i % 7) * 0.05), s);
+      const yScale = s * (0.85 + (i % 7) * 0.05);
+      const x = base.x + wx * span;
+      const z = base.z + wz * span;
+      this.dummy.position.set(x, TREE_BASE_OFFSET, z);
+      this.dummy.scale.set(s, yScale, s);
       this.dummy.rotation.y = i * 1.7;
       this.dummy.updateMatrix();
       this.treeTrunks.setMatrixAt(i, this.dummy.matrix);
       this.treeCrowns.setMatrixAt(i, this.dummy.matrix);
+
+      // Derive the collision cone from the very same transform, so a tree can
+      // never be hit where it is not drawn.
+      this.treeX[i] = x;
+      this.treeZ[i] = z;
+      this.treeApex[i] = TREE_BASE_OFFSET + CROWN_APEX_Y * yScale;
+      this.treeCrownBase[i] = TREE_BASE_OFFSET + CROWN_BASE_Y * yScale;
+      this.treeRadius[i] = CROWN_RADIUS * s;
     }
     if (dirty) {
       this.treeTrunks.instanceMatrix.needsUpdate = true;
@@ -201,5 +230,39 @@ export class World {
 
   update(birdPosition: THREE.Vector3) {
     this.layoutTrees(birdPosition);
+  }
+
+  /** Height of the tallest tree, so stars can be kept clear of the canopy. */
+  get canopyHeight(): number {
+    return TREE_BASE_OFFSET + CROWN_APEX_Y * (0.6 + 0.55) * 1.15;
+  }
+
+  /**
+   * Does a sphere at `p` touch any tree?
+   *
+   * Trees are tested as cones rather than cylinders: near the top a crown is
+   * barely wider than a twig, and clipping a treetop that is visibly a metre
+   * to your left would feel like a cheat. Only 900 instances exist and most
+   * are rejected by the first two comparisons, so a full sweep is cheap.
+   */
+  hitsTree(p: THREE.Vector3, bodyRadius: number): boolean {
+    for (let i = 0; i < TREE_COUNT; i++) {
+      const apex = this.treeApex[i];
+      if (p.y > apex + bodyRadius) continue;
+
+      const dx = p.x - this.treeX[i];
+      const dz = p.z - this.treeZ[i];
+      const dist2 = dx * dx + dz * dz;
+
+      const widest = this.treeRadius[i] + bodyRadius;
+      if (dist2 > widest * widest) continue;
+
+      // Taper the radius toward the point of the cone.
+      const crownBase = this.treeCrownBase[i];
+      const frac = p.y <= crownBase ? 1 : (apex - p.y) / (apex - crownBase);
+      const r = this.treeRadius[i] * Math.max(0, frac) + bodyRadius;
+      if (dist2 < r * r) return true;
+    }
+    return false;
   }
 }

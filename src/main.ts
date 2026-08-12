@@ -69,6 +69,14 @@ async function main() {
     onScore: (s) => hud.setScore(s),
     onTime: (t) => hud.setTime(t),
     onCollect: (streak) => audio.star(streak),
+    onFlap: (strength) => audio.flap(strength),
+    onBonus: (seconds) => {
+      hud.flashBonus(seconds);
+      audio.bonus();
+    },
+    onCrash: () => audio.crash(),
+    onCall: () => audio.call(),
+    onReticle: (r) => hud.setReticle(r.x, r.y, r.visible, r.locked),
     onPhase: (phase) => {
       if (phase === "waiting") {
         stage = "waiting";
@@ -82,7 +90,7 @@ async function main() {
         stage = "gameover";
         audio.gameOver();
         const score = game.score;
-        hud.gameover(score, best);
+        hud.gameover(score, best, game.crashed);
         if (score > best) {
           best = score;
           try {
@@ -151,6 +159,12 @@ async function main() {
       game.startRun();
     }
   };
+
+  // Dev-only handle so the browser tests can fly the real game with a scripted
+  // autopilot. Vite strips this branch entirely from production builds.
+  if (import.meta.env.DEV) {
+    (window as unknown as { __hornbill?: unknown }).__hornbill = { game, hud, audio };
+  }
 
   hud.intro();
 }

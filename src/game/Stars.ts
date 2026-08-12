@@ -14,10 +14,15 @@ const SPAWN_SIDE = 120;
  * altitudes. A player who flaps hard climbs to the ceiling, and with a fixed
  * band every star would sit below them, unreachable, for the whole round.
  */
-const SPAWN_BELOW = 55;
-const SPAWN_ABOVE = 45;
-const SPAWN_Y_MIN = 46;
-const SPAWN_Y_MAX = 195;
+const SPAWN_BELOW = 30;
+const SPAWN_ABOVE = 30;
+/**
+ * The floor sits just clear of the tallest tree (~30 units). Stars are never
+ * buried in the canopy, but the low ones sit close enough to it that going
+ * after them is the risky line — which is the point of flying down here.
+ */
+const SPAWN_Y_MIN = 38;
+const SPAWN_Y_MAX = 125;
 /** A star this far behind the bird is out of play and gets recycled ahead. */
 const RECYCLE_BEHIND = 90;
 
@@ -163,7 +168,7 @@ export class Stars {
       if (
         along < -RECYCLE_BEHIND ||
         toStar.length() > SPAWN_AHEAD_MAX + 220 ||
-        Math.abs(star.position.y - birdPos.y) > 115
+        Math.abs(star.position.y - birdPos.y) > 90
       ) {
         this.placeAhead(star, birdPos, heading);
       }

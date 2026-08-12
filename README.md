@@ -2,8 +2,11 @@
 
 Fly a low-poly hornbill over the rainforest using your body. Stand in front of
 your webcam, strike a **T-pose** to launch, **flap your arms** to gain height and
-**lean left or right** to steer. You have **60 seconds** to collect as many stars
-as you can.
+**lean left or right** to steer.
+
+You start with **60 seconds**. The bird sinks constantly, so you have to keep
+flapping or you drop into the canopy and crash. Every **3 stars buys 10 more
+seconds**, which is what keeps a good run going.
 
 No controller, no keyboard needed — the camera reads your pose and nothing ever
 leaves your machine.
@@ -33,7 +36,7 @@ button.
 
 | Gesture                            | What it does                                  |
 | ---------------------------------- | --------------------------------------------- |
-| **Flap** — swing both arms down    | A beat of lift. Stop flapping and you sink     |
+| **Flap** — swing both arms down    | A beat of lift. Stop and you sink into the trees |
 | **Lean** — tilt your shoulders     | Banks and turns the bird                       |
 | **Hands together** — in front of you | Tucks the wings into a divebomb: fast descent, extra speed |
 | **T-pose** — arms straight out, 1s | Launches a run from the ready screen           |
@@ -42,7 +45,13 @@ Stand back far enough that your head, both hands and your hips are all in frame.
 The preview in the bottom-left corner shows the skeleton the game is reading, so
 you can tell at a glance whether it can see you.
 
-When the clock runs out you must press **Fly again** to go round again. That is
+A crosshair shows where you are actually going. It turns gold when holding your
+current course would run you through a star.
+
+Fly too low and you hit a tree, which ends the run on the spot. Stars sit just
+above the treetops, so the tempting ones are the risky ones.
+
+When the run ends you must press **Fly again** to go round again. That is
 deliberate: you have just finished flapping, and a stray pose should not throw
 you straight back into a run.
 
@@ -70,11 +79,21 @@ button in the top-right mutes everything.
   meshes whose instances wrap around the bird, so the world is endless at a
   constant instance count.
 - **Audio** — `src/audio/Audio.ts` synthesises everything with Web Audio: the
-  star chime (whose pitch climbs as you chain pickups), the dive whoosh, and a
+  star chime (whose pitch climbs as you chain pickups), a wing whoosh on every
+  flap, the occasional nasal hornbill honk, the dive rush, the crash, and a
   looping four-bar backing track built from a pad and a sparse arpeggio. No
   audio files, for the same reason there are no model files. Browsers will not
   start an AudioContext without a user gesture, which is what the Start button
   is really for.
+- **The crosshair** — rather than approximating where the bird is heading, the
+  reticle runs the *real* `Flight.update()` on a throwaway copy of the bird for
+  1.6 seconds and projects the end of that path through the same camera that
+  just rendered the frame. There is only one set of physics, so the cross
+  cannot drift out of agreement with the flight model — and a test asserts the
+  prediction lands within half a unit of where the bird actually ends up.
+- **Tree collision** — crowns are tested as cones, not cylinders, using
+  dimensions derived from the very same instance transform that draws them. A
+  treetop that is visibly to your left will not clip you.
 - **Frame rates** — pose detection runs on the webcam's clock (usually 30fps)
   while rendering runs on its own. Flaps and T-poses are latched between the two
   so a gesture is never missed or counted twice.

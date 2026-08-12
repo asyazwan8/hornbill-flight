@@ -5,11 +5,14 @@ import { clamp, damp, lerp, type FlightInput } from "./types";
 // the bird overshoots every star, because shoulder-steering is nowhere near
 // precise enough to correct a 30 unit/second plunge.
 const FORWARD_SPEED = 32;
-const GRAVITY = 14;
-const FLAP_IMPULSE = 11;
-const VY_MAX = 17;
-const VY_MIN = -22;
-const AIR_DRAG = 0.5;
+// Heavy drag against a modest gravity gives a slow steady sink (about 12
+// units/second) instead of an accelerating fall, so a bird left alone drifts
+// gently down toward the canopy and one wingbeat visibly lifts it again.
+const GRAVITY = 11;
+const FLAP_IMPULSE = 10;
+const VY_MAX = 15;
+const VY_MIN = -18;
+const AIR_DRAG = 0.9;
 
 /** Divebomb: extra downward pull, a speed bonus, and a deeper terminal drop. */
 const DIVE_ACCEL = 46;
@@ -23,9 +26,14 @@ const MAX_BANK = 0.62; // radians
 const MAX_PITCH = 0.42;
 const MAX_PITCH_DIVE = 0.95;
 
-/** Soft ceiling and floor. The bird is eased back rather than hard-clamped. */
-const MIN_ALTITUDE = 40;
-const MAX_ALTITUDE = 205;
+/**
+ * The bird now flies down among the treetops, so there is deliberately no soft
+ * floor holding it up: sink far enough and you hit the canopy. GROUND_Y only
+ * stops the bird falling through the world before the crash check runs.
+ */
+export const START_ALTITUDE = 55;
+export const GROUND_Y = 5;
+const MAX_ALTITUDE = 135;
 
 /** Seconds without a flap before the bird counts as gliding. */
 const GLIDE_AFTER = 0.55;
@@ -35,7 +43,7 @@ const GLIDE_AFTER = 0.55;
  * beat by flapping, and steering that banks into the turn.
  */
 export class Flight {
-  readonly position = new THREE.Vector3(0, 90, 0);
+  readonly position = new THREE.Vector3(0, START_ALTITUDE, 0);
   heading = 0;
   vy = 0;
 
@@ -60,7 +68,7 @@ export class Flight {
   }
 
   reset() {
-    this.position.set(0, 90, 0);
+    this.position.set(0, START_ALTITUDE, 0);
     this.heading = 0;
     this.vy = 0;
     this.bank = 0;
@@ -100,11 +108,11 @@ export class Flight {
     this.position.y += this.vy * dt;
     this.position.addScaledVector(this.forward, FORWARD_SPEED * (1 + DIVE_SPEED_BONUS * this.dive) * dt);
 
-    // Soft boundaries: push back gently instead of stopping dead.
-    if (this.position.y < MIN_ALTITUDE) {
-      const depth = MIN_ALTITUDE - this.position.y;
-      this.vy += depth * 5.5 * dt;
-      if (this.position.y < MIN_ALTITUDE - 12) this.position.y = MIN_ALTITUDE - 12;
+    // Hard floor only, so the bird cannot drop through the world while the
+    // crash check is deciding. There is no soft floor: sinking is a real risk.
+    if (this.position.y < GROUND_Y) {
+      this.position.y = GROUND_Y;
+      this.vy = Math.max(this.vy, 0);
     }
     if (this.position.y > MAX_ALTITUDE) {
       this.vy -= (this.position.y - MAX_ALTITUDE) * 4 * dt;
@@ -122,4 +130,33 @@ export class Flight {
   get isDiving(): boolean {
     return this.dive > 0.35;
   }
+
+  /**
+   * Where the bird will be if the player holds the current course and does not
+   * flap.
+   *
+   * This runs the real `update()` on a throwaway copy rather than
+   * reimplementing the integration, so the aiming reticle cannot drift out of
+   * agreement with the flight model — there is only one set of physics.
+   */
+  predictPath(seconds: number, samples: number, into: THREE.Vector3[] = []): THREE.Vector3[] {
+    const ghost = Flight.ghost;
+    ghost.position.copy(this.position);
+    ghost.vy = this.vy;
+    ghost.heading = this.heading;
+    ghost.steer = this.steer;
+    ghost.dive = this.dive;
+
+    const dt = seconds / samples;
+    for (let i = 0; i < samples; i++) {
+      ghost.update(dt, { flap: 0, steer: this.steer, dive: this.dive });
+      if (into[i]) into[i].copy(ghost.position);
+      else into[i] = ghost.position.clone();
+    }
+    into.length = samples;
+    return into;
+  }
+
+  /** Reused so predicting a path every frame does not allocate. */
+  private static ghost = new Flight();
 }
