@@ -4,6 +4,7 @@ dist
 *.local
 .vercel
 .env.production
+.env
 
 # Staged by scripts/fetch-assets.mjs on npm install. ~17MB of MediaPipe
 # runtime and model that does not belong in git.

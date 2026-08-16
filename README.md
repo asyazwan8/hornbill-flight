@@ -8,8 +8,9 @@ You start with **60 seconds**. The bird sinks constantly, so you have to keep
 flapping or you drop into the canopy and crash. Every **3 stars buys 10 more
 seconds**, which is what keeps a good run going.
 
-No controller, no keyboard needed — the camera reads your pose and nothing ever
-leaves your machine.
+No controller, no keyboard needed — the camera reads your pose, and no video
+ever leaves your machine. If a leaderboard is configured, the only thing that
+goes anywhere is a finished run: a name, a star count and how long you lasted.
 
 ## Getting started
 
@@ -63,6 +64,64 @@ Sound is synthesised in the browser, apart from the hornbill call, which is a
 9KB recording of the real bird. The speaker button in the top-right mutes
 everything.
 
+## Leaderboard
+
+Runs can be posted to a shared board backed by [Supabase](https://supabase.com).
+It shows on the ready screen — the scores to beat — and again after every run,
+where you can put your name to what you just flew. Entries rank by stars first
+and, when two runs tie, by whoever stayed in the air longest.
+
+It is entirely optional. With no project configured the board hides itself and
+the game keeps the single best score in the browser exactly as it always has,
+which is also what happens if the network is down mid-session.
+
+### Setting it up
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. Open **SQL Editor → New query**, paste in `supabase/schema.sql` and run it.
+   That creates the table, its ranking index, and the row level security
+   policies. Running it twice is harmless.
+3. Copy `.env.example` to `.env`, and fill in the two values from
+   **Project Settings → API**:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   ```
+   VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+4. Restart `npm run dev`. Vite only reads env files at startup.
+
+For a deployed site, set those same two variables in your host's environment
+rather than committing a `.env` — `.env` is gitignored for that reason.
+
+### What stops people posting nonsense
+
+Not as much as you might like, and it is worth being honest about why. The game
+is a static site: the anon key is inside the bundle, where anyone can read it,
+so "the client is trusted" is the starting position no amount of frontend code
+changes. What the database can still insist on, it does:
+
+- **No edits, ever.** The policies grant `SELECT` and `INSERT` and nothing else.
+  With no `UPDATE` or `DELETE` policy, row level security refuses both, so a
+  posted score cannot be altered or another player's removed.
+- **Runs must be physically possible.** A run starts with 60 seconds and every
+  3 stars buys 10 more, so the clock a player can have burned is bounded by
+  their star count. A `CHECK` constraint enforces exactly that relationship,
+  which is what makes "999 stars in four seconds" impossible to post.
+- **Names and scores are bounded** — 16 characters, 0–999 stars — by the same
+  kind of constraint, so the board cannot be flooded with a megabyte of text.
+
+A determined person with `curl` can still post a plausible-looking score, and
+that is the honest ceiling for a game with no server of its own. If it ever
+matters, `src/leaderboard/Leaderboard.ts` keeps the write behind a single
+`submit()` function; pointing it at a Supabase Edge Function holding the
+service role key is a one-file change, and nothing else in the game would
+notice.
+
 ## How it works
 
 - **Pose tracking** — MediaPipe's `PoseLandmarker` (lite) returns 33 body
@@ -103,6 +162,12 @@ everything.
 - **Frame rates** — pose detection runs on the webcam's clock (usually 30fps)
   while rendering runs on its own. Flaps and T-poses are latched between the two
   so a gesture is never missed or counted twice.
+- **The leaderboard** — Supabase serves every table over PostgREST, so reading
+  the top ten and posting a run are one `fetch` each and the client library is
+  not worth its own bundle size. Every call is optional and time-limited: the
+  board hides itself rather than blocking a game that is meant to be played
+  offline. Other players' names are written to the DOM as text, never as
+  markup, so a name cannot smuggle a script onto anyone else's screen.
 
 ## Tuning the controls
 
@@ -149,9 +214,13 @@ src/
     PoseOverlay.ts   the skeleton preview
   audio/Audio.ts     music, sound effects and the call playback
   input/Keyboard.ts  keyboard fallback
+  leaderboard/
+    Leaderboard.ts   Supabase over plain fetch, plus the local best score
   ui/Hud.ts          score, timer, panels and buttons
 scripts/
   fetch-assets.mjs   stages the wasm runtime and pose model into public/
+supabase/
+  schema.sql         leaderboard table, policies and constraints
 public/
   audio/             the hornbill call recording (in git, 9KB)
   mediapipe/wasm/    MediaPipe runtime      (staged on install, gitignored)
