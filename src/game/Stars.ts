@@ -5,6 +5,28 @@ const STAR_COUNT = 16;
 /** Generous on purpose: steering with your shoulders is not precise. */
 const COLLECT_RADIUS = 8.0;
 
+/**
+ * A star inside this radius drifts toward the bird.
+ *
+ * Steering with your shoulders is coarse, and missing a star by a metre reads
+ * as the game's fault rather than yours. The field is a little over twice the
+ * pickup radius: wide enough to forgive a near miss, tight enough that stars
+ * are never visibly sucked in from across the sky. At a forward speed of 32
+ * the bird crosses the whole field in about a second, so the pull has to be
+ * gentle to stay invisible.
+ */
+const MAGNET_RADIUS = 18.0;
+
+/**
+ * Fraction of the remaining gap closed per second, at the field's centre.
+ *
+ * Tuned against the half second or so a star spends in range at cruising
+ * speed: a miss of ~10 units turns into a catch, ~12 just about does, and
+ * anything wider is helped but still gets away. Raising this much past 1.5
+ * hoovers up the whole field and the stars stop being something you aim at.
+ */
+const MAGNET_RATE = 1.2;
+
 /** Where new stars appear, measured along the bird's heading. */
 const SPAWN_AHEAD_MIN = 110;
 const SPAWN_AHEAD_MAX = 320;
@@ -154,8 +176,21 @@ export class Stars {
       star.position.y += Math.sin(t * 1.5 + i * 2.1) * dt * 2.2;
 
       toStar.subVectors(star.position, birdPos);
+      let distance = toStar.length();
 
-      if (toStar.length() < COLLECT_RADIUS) {
+      // The magnet. Strength fades to nothing at the edge of the field, so a
+      // star eases inward as it approaches rather than twitching the instant
+      // it comes into range, and grows as the gap closes, so a near miss ends
+      // up feeling like a catch. Exponential, so the pull is the same however
+      // fast the machine happens to be rendering.
+      if (distance > COLLECT_RADIUS && distance < MAGNET_RADIUS) {
+        const strength = 1 - (distance - COLLECT_RADIUS) / (MAGNET_RADIUS - COLLECT_RADIUS);
+        star.position.lerp(birdPos, 1 - Math.exp(-MAGNET_RATE * strength * dt));
+        toStar.subVectors(star.position, birdPos);
+        distance = toStar.length();
+      }
+
+      if (distance < COLLECT_RADIUS) {
         collected++;
         this.spawnBurst(star.position);
         this.placeAhead(star, birdPos, heading);
@@ -167,7 +202,7 @@ export class Stars {
       const along = toStar.dot(forward);
       if (
         along < -RECYCLE_BEHIND ||
-        toStar.length() > SPAWN_AHEAD_MAX + 220 ||
+        distance > SPAWN_AHEAD_MAX + 220 ||
         Math.abs(star.position.y - birdPos.y) > 90
       ) {
         this.placeAhead(star, birdPos, heading);
