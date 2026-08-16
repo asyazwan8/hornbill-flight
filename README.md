@@ -43,8 +43,10 @@ button.
 | **T-pose** — arms straight out, 1s | Launches a run, from the ready screen or after one ends |
 
 Stand back far enough that your head, both hands and your hips are all in frame.
-The preview in the bottom-left corner shows the skeleton the game is reading, so
-you can tell at a glance whether it can see you.
+The preview in the top-right corner shows the skeleton the game is reading, so
+you can tell at a glance whether it can see you. Its pill reads TRACKING while
+the pose is good and STEP BACK when you drop out of frame, and the caption
+underneath names the gesture it currently thinks you are making.
 
 A crosshair shows where you are actually going. It turns gold when holding your
 current course would run you through a star.
@@ -59,15 +61,45 @@ before they have read their score — hold the pose through that pause and it
 launches the moment it lifts, with no need to re-pose.
 
 Note that flying straight into the next run this way skips posting your score
-to the leaderboard, which needs the button.
+to the leaderboard, which lives behind the summary's **BOARD** button.
 
 Keyboard controls work at the same time, which is handy for development:
 **Space** to flap, **arrow keys** to steer, **down arrow** (or Shift) to
 divebomb, **Enter** to press whatever button is on screen.
 
 Sound is synthesised in the browser, apart from the hornbill call, which is a
-9KB recording of the real bird. The speaker button in the top-right mutes
+9KB recording of the real bird. The speaker button in the bottom-right mutes
 everything.
+
+## The interface
+
+The UI is built to a design handoff — a chunky tropical-arcade direction, in
+the spirit of a mid-90s mascot platformer — across three screens:
+
+- **Title** — the wordmark, the four body controls as chips, the top flyers,
+  and START.
+- **In-flight HUD** — a star counter that pops on every pickup, a countdown,
+  an altitude meter that goes into a red alarm when you drop toward the
+  canopy, the pose preview, a combo shout for chained pickups, and a toast
+  when stars buy you more time.
+- **Run summary** — stars, airtime and best combo as three tiles, your
+  placement as a rank ribbon, and FLY AGAIN / BOARD.
+
+The screens were authored at 960×540 and are meant to scale as a whole rather
+than reflow, so every size in `src/style.css` is written in rem against a root
+font size driven off the viewport: **1rem is 16px at the design size**, which
+makes each number in the stylesheet the handoff's pixel value over 16. The
+exception is the HUD panels, which stay pinned to the corners of whatever
+window they get rather than scaling away from the edges on a tall monitor.
+
+Both fonts — Luckiest Guy and Baloo 2 — are self-hosted from `public/fonts`
+(latin subsets, ~50KB total) rather than loaded from Google Fonts, for the
+same reason the MediaPipe runtime is served locally: no CDN dependency, and
+the game keeps working offline. Baloo 2 is variable, so one file covers every
+weight the design uses.
+
+Motion follows the handoff too, and the whole lot is dropped under
+`prefers-reduced-motion` apart from the opacity fades.
 
 ## Leaderboard
 
@@ -233,13 +265,14 @@ src/
   input/Keyboard.ts  keyboard fallback
   leaderboard/
     Leaderboard.ts   Supabase over plain fetch, plus the local best score
-  ui/Hud.ts          score, timer, panels and buttons
+  ui/Hud.ts          HUD meters, screens, panels and buttons
 scripts/
   fetch-assets.mjs   stages the wasm runtime and pose model into public/
 supabase/
   schema.sql         leaderboard table, policies and constraints
 public/
   audio/             the hornbill call recording (in git, 9KB)
+  fonts/             Luckiest Guy and Baloo 2, self-hosted (in git, ~50KB)
   mediapipe/wasm/    MediaPipe runtime      (staged on install, gitignored)
   models/            pose_landmarker_lite.task    (likewise)
 ```
