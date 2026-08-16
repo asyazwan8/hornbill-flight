@@ -8,7 +8,6 @@ import { GameAudio } from "./audio/Audio";
 import type { SummaryStats } from "./ui/Hud";
 import type { LeaderboardEntry } from "./leaderboard/Leaderboard";
 import {
-  PREFLIGHT_ROWS,
   TOP_N,
   cleanName,
   fetchTop,
@@ -154,7 +153,6 @@ async function main() {
       if (phase === "waiting") {
         stage = "waiting";
         hud.waiting(poseAvailable);
-        void loadBoard(PREFLIGHT_ROWS);
       } else if (phase === "playing") {
         stage = "waiting";
         hud.setTimeReference(ROUND_SECONDS);
@@ -180,14 +178,15 @@ async function main() {
           crashed: game.crashed,
           ...placement(score, game.runSeconds),
         });
-        hud.setSummaryHint(
-          leaderboardConfigured()
-            ? "Press BOARD to post this run." + (poseAvailable ? " Or hold a T-pose to fly again." : "")
-            : poseAvailable
-              ? "Hold a T-pose to fly again."
-              : ""
-        );
-        void loadBoard(TOP_N);
+        hud.setSummaryHint(poseAvailable ? "Hold a T-pose to fly again." : "");
+        if (score > 0 && leaderboardConfigured()) hud.showScoreForm(readName());
+        // The ribbon is drawn twice on purpose: once immediately from the
+        // cached board so it is there the instant the screen appears, and
+        // again once a fresh read lands, in case somebody posted mid-flight.
+        void loadBoard(TOP_N).then(() => {
+          const fresh = placement(score, game.runSeconds);
+          hud.setRank(fresh.rank, fresh.rankMessage);
+        });
       }
     },
   });
@@ -197,13 +196,16 @@ async function main() {
 
   hud.onMuteToggle = (muted) => audio.setMuted(muted);
 
-  // The name field lives behind the BOARD button, so it is only built when
-  // the player actually asks to see the board. A scoreless run has nothing
-  // worth posting, but the board is still worth reading.
+  // Reopening the board refreshes it, in case someone else posted meanwhile.
   hud.onBoardRequested = () => {
     if (lastRun && lastRun.stars > 0 && leaderboardConfigured()) hud.showScoreForm(readName());
     void loadBoard(TOP_N);
   };
+
+  // Nobody has touched the summary for a while, so put the title back up for
+  // whoever walks up next. The run itself is already over -- this only swaps
+  // the screen, so a T-pose still launches straight from here.
+  hud.onIdle = () => hud.attract();
 
   hud.onSubmitScore = async (rawName) => {
     if (!lastRun) return;
@@ -283,7 +285,9 @@ async function main() {
   }
 
   hud.intro();
-  void loadBoard(PREFLIGHT_ROWS);
+  // Warm the board so the first run's rank ribbon has something to rank
+  // against. Nothing is on screen to show it yet; this is purely the cache.
+  void loadBoard(TOP_N);
 }
 
 main();

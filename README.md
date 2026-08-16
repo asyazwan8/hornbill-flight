@@ -61,7 +61,7 @@ before they have read their score — hold the pose through that pause and it
 launches the moment it lifts, with no need to re-pose.
 
 Note that flying straight into the next run this way skips posting your score
-to the leaderboard, which lives behind the summary's **BOARD** button.
+to the leaderboard, which needs the name field on the summary screen.
 
 Keyboard controls work at the same time, which is handy for development:
 **Space** to flap, **arrow keys** to steer, **down arrow** (or Shift) to
@@ -76,14 +76,19 @@ everything.
 The UI is built to a design handoff — a chunky tropical-arcade direction, in
 the spirit of a mid-90s mascot platformer — across three screens:
 
-- **Title** — the wordmark, the four body controls as chips, the top flyers,
-  and START.
+- **Title** — the wordmark, the four body controls as chips, and START at the
+  foot of the screen. It doubles as the attract screen: leave the run summary
+  alone for 15 seconds and the game drops back here, so the next person to
+  walk up finds the title rather than a stranger's score. Any pointer move or
+  keypress restarts that countdown.
 - **In-flight HUD** — a star counter that pops on every pickup, a countdown,
   an altitude meter that goes into a red alarm when you drop toward the
   canopy, the pose preview, a combo shout for chained pickups, and a toast
   when stars buy you more time.
 - **Run summary** — stars, airtime and best combo as three tiles, your
-  placement as a rank ribbon, and FLY AGAIN / BOARD.
+  placement as a rank ribbon, FLY AGAIN, and the leaderboard. This is the only
+  screen the board appears on, so it opens with the screen; HIDE collapses it
+  for anyone who just wants to fly again.
 
 The screens were authored at 960×540 and are meant to scale as a whole rather
 than reflow, so every size in `src/style.css` is written in rem against a root
@@ -104,11 +109,11 @@ Motion follows the handoff too, and the whole lot is dropped under
 ## Leaderboard
 
 Runs can be posted to a shared board backed by [Supabase](https://supabase.com).
-It shows on the ready screen — the scores to beat — and again after every run,
-where you can put your name to what you just flew. Entries rank by stars first
-and, when two runs tie, by whoever stayed in the air longest.
+It sits on the run summary, where you can put your name to what you just flew.
+Entries rank by stars first and, when two runs tie, by whoever stayed in the
+air longest.
 
-It is entirely optional. With no project configured the board hides itself and
+It is entirely optional. With no project configured the board sits empty and
 the game keeps the single best score in the browser exactly as it always has,
 which is also what happens if the network is down mid-session.
 
