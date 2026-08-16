@@ -44,7 +44,8 @@ const newStars = () => new Stars(new THREE.Scene());
   const stars = newStars();
   const bird = new THREE.Vector3(0, START_ALTITUDE, 0);
   stars.reset(bird, heading);
-  // Sit 20 units off a star: outside the 8 unit pickup radius.
+  // Sit 20 units off a star: clear of the 8 unit pickup radius and of the
+  // 18 unit magnet field, so nothing should reach for it.
   const near = stars.positions[0].clone().add(new THREE.Vector3(20, 0, 0));
   const collected = stars.update(1 / 60, near, heading);
   check("passing well wide of a star collects nothing", collected === 0, `collected=${collected}`);
@@ -59,6 +60,91 @@ const newStars = () => new Stars(new THREE.Scene());
   const after = stars.positions[0];
   const movedAhead = after.z > before.z || after.distanceTo(before) > 50;
   check("a collected star respawns ahead", movedAhead, `moved ${after.distanceTo(before).toFixed(0)} units`);
+}
+
+/* ---------------- magnet ---------------- */
+{
+  const stars = newStars();
+  const bird = new THREE.Vector3(0, START_ALTITUDE, 0);
+  stars.reset(bird, heading);
+
+  // Hold still 14 units off a star: past the pickup radius, inside the field.
+  const near = stars.positions[0].clone().add(new THREE.Vector3(14, 0, 0));
+  const before = stars.positions[0].distanceTo(near);
+  for (let i = 0; i < 30; i++) stars.update(1 / 60, near, heading);
+  const after = stars.positions[0].distanceTo(near);
+
+  check(
+    "a near miss is drawn in by the magnet",
+    after < before - 1 && after > 0,
+    `gap ${before.toFixed(1)} -> ${after.toFixed(1)} units in half a second`
+  );
+}
+
+{
+  const stars = newStars();
+  const bird = new THREE.Vector3(0, START_ALTITUDE, 0);
+  stars.reset(bird, heading);
+
+  // Given long enough, the pull closes a near miss into an actual pickup. A
+  // collected star is recycled far ahead, which is the tell.
+  const near = stars.positions[0].clone().add(new THREE.Vector3(12, 0, 0));
+  for (let i = 0; i < 120; i++) stars.update(1 / 60, near, heading);
+
+  check(
+    "the magnet turns a near miss into a pickup",
+    stars.positions[0].distanceTo(near) > 100,
+    `star ended ${stars.positions[0].distanceTo(near).toFixed(0)} units away, i.e. respawned`
+  );
+}
+
+{
+  const stars = newStars();
+  const bird = new THREE.Vector3(0, START_ALTITUDE, 0);
+  stars.reset(bird, heading);
+
+  // Outside the field the star is left alone. Only the idle bob should move
+  // it, which is worth well under a unit of distance.
+  const far = stars.positions[0].clone().add(new THREE.Vector3(30, 0, 0));
+  const before = stars.positions[0].distanceTo(far);
+  for (let i = 0; i < 60; i++) stars.update(1 / 60, far, heading);
+  const after = stars.positions[0].distanceTo(far);
+
+  check(
+    "the magnet does not reach beyond its field",
+    Math.abs(after - before) < 1,
+    `gap ${before.toFixed(1)} -> ${after.toFixed(1)} units`
+  );
+}
+
+{
+  // The pull is exponential precisely so a fast machine does not collect more
+  // than a slow one. Same star, same bird, same simulated second, four times
+  // the frame rate.
+  const slow = newStars();
+  const fast = newStars();
+  const origin = new THREE.Vector3(0, START_ALTITUDE, 0);
+  slow.reset(origin, heading);
+  fast.reset(origin, heading);
+  fast.positions[0].copy(slow.positions[0]);
+
+  // Stopping short of a pickup on purpose: once a star is collected it
+  // respawns at a random distance, and comparing two respawns would pass
+  // whatever the magnet did.
+  const bird = slow.positions[0].clone().add(new THREE.Vector3(14, 0, 0));
+  for (let i = 0; i < 12; i++) slow.update(1 / 30, bird, heading);
+  for (let i = 0; i < 48; i++) fast.update(1 / 120, bird, heading);
+
+  const gapSlow = slow.positions[0].distanceTo(bird);
+  const gapFast = fast.positions[0].distanceTo(bird);
+  const bothStillInPlay = gapSlow < 18 && gapFast < 18;
+  check(
+    "the magnet pulls the same at any frame rate",
+    bothStillInPlay && Math.abs(gapSlow - gapFast) < 0.5,
+    bothStillInPlay
+      ? `30fps left ${gapSlow.toFixed(2)}, 120fps left ${gapFast.toFixed(2)} units`
+      : `a star respawned mid-test (${gapSlow.toFixed(0)}, ${gapFast.toFixed(0)}), so nothing was compared`
+  );
 }
 
 /* ---------------- spawn band ---------------- */

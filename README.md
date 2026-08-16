@@ -156,6 +156,13 @@ notice.
   just rendered the frame. There is only one set of physics, so the cross
   cannot drift out of agreement with the flight model — and a test asserts the
   prediction lands within half a unit of where the bird actually ends up.
+- **The star magnet** — a star inside 18 units drifts toward the bird, gently
+  at the edge of that field and harder as the gap closes, so a near miss
+  becomes a catch. Steering comes from your shoulders and is coarse by nature;
+  without this, missing by a metre reads as the game's fault. The pull is
+  exponential rather than a fixed step per frame, so a 120fps machine does not
+  collect stars a 30fps one would drop — there is a test for exactly that. It
+  is deliberately weak enough that a wide miss still gets away.
 - **Tree collision** — crowns are tested as cones, not cylinders, using
   dimensions derived from the very same instance transform that draws them. A
   treetop that is visibly to your left will not clip you.
@@ -185,6 +192,9 @@ Every threshold worth touching is a named constant at the top of
 | `DIVE_GAP_FULL/NONE` | How close your hands must be to trigger a full divebomb |
 
 Flight feel — gravity, lift per flap, turn rate — lives in `src/game/Flight.ts`.
+How forgiving star pickups are lives in `src/game/Stars.ts`: `COLLECT_RADIUS`
+for the pickup itself, and `MAGNET_RADIUS` / `MAGNET_RATE` for the pull that
+draws a near miss in.
 
 ## Development pages
 
