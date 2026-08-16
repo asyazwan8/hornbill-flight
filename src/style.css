@@ -642,18 +642,18 @@ body {
   color: var(--cream-200);
 }
 
-.title-bottom-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 1.625rem;
-  margin-top: 1.125rem;
-}
-
+/*
+ * The action block is pushed to the foot of the screen, so START and FLY NOW
+ * always sit bottom-centre however tall the window is and whether or not the
+ * instruction chips are showing.
+ */
 .title-action {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.625rem;
+  margin-top: auto;
+  padding-bottom: 0.5rem;
 }
 
 .title-hint {
@@ -920,6 +920,10 @@ body {
 .summary-board {
   margin-top: 1rem;
   text-align: left;
+}
+
+.summary-board .board-title {
+  text-align: center;
 }
 
 /*

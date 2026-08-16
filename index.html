@@ -89,18 +89,10 @@
           <li class="chip"><span class="swatch swatch-tpose"></span><span class="chip-text"><b>T-POSE</b> launch</span></li>
         </ul>
 
-        <div class="title-bottom-row">
-          <section id="board-panel" class="board hidden">
-            <h2 class="board-title">TOP FLYERS</h2>
-            <p id="board-note" class="board-note"></p>
-            <ol id="board-list" class="board-list"></ol>
-          </section>
-
-          <div class="title-action">
-            <div id="tpose-meter" class="tpose-meter hidden"><div class="tpose-fill"></div></div>
-            <button id="primary-btn" class="crate-btn">START</button>
-            <p id="title-hint" class="title-hint"></p>
-          </div>
+        <div class="title-action">
+          <div id="tpose-meter" class="tpose-meter hidden"><div class="tpose-fill"></div></div>
+          <button id="primary-btn" class="crate-btn">START</button>
+          <p id="title-hint" class="title-hint"></p>
         </div>
       </div>
 
@@ -124,12 +116,13 @@
 
           <div class="summary-actions">
             <button id="again-btn" class="crate-btn">FLY AGAIN</button>
-            <button id="board-btn" class="crate-btn crate-btn-ghost">BOARD</button>
+            <button id="board-btn" class="crate-btn crate-btn-ghost">HIDE</button>
           </div>
 
-          <!-- Revealed by the BOARD button: the full leaderboard plus the
-               name field, which is the only way a run gets posted. -->
-          <div id="summary-board" class="summary-board hidden">
+          <!-- The only place the board appears. Open with the screen; the
+               BOARD button collapses it for anyone who just wants to fly. -->
+          <div id="summary-board" class="summary-board">
+            <h2 class="board-title">TOP FLYERS</h2>
             <form id="score-form" class="score-form hidden">
               <label class="sr-only" for="player-name">Your name</label>
               <input id="player-name" class="name-input" type="text" maxlength="16" placeholder="Your name" autocomplete="nickname" spellcheck="false" />

@@ -34,6 +34,14 @@ export const asClock = (seconds: number): string => {
 /** Below this the altitude meter goes into its low-altitude alarm. */
 const LOW_ALTITUDE = 0.3;
 
+/**
+ * How long the run summary sits before the game drops back to its attract
+ * screen. This is a game played standing in a room: whoever just flew has
+ * walked off, and the next person should find the title inviting them in
+ * rather than a stranger's score.
+ */
+const IDLE_RETURN_MS = 15000;
+
 /** The pose captions, in the design's clipped uppercase voice. */
 const POSE_CAPTION: Record<PoseStatus, string> = {
   "no-pose": "STEP INTO VIEW",
@@ -69,10 +77,6 @@ export class Hud {
   private meterFill = $("tpose-meter").querySelector(".tpose-fill") as HTMLElement;
   private button = $<HTMLButtonElement>("primary-btn");
 
-  private boardPanel = $("board-panel");
-  private boardNote = $("board-note");
-  private boardList = $<HTMLOListElement>("board-list");
-
   private summaryScreen = $("summary-screen");
   private summaryTitle = $("summary-title");
   private summarySubtitle = $("summary-subtitle");
@@ -107,14 +111,15 @@ export class Hud {
   onMuteToggle?: (muted: boolean) => void;
   /** Called when the player posts their run to the leaderboard. */
   onSubmitScore?: (name: string) => void;
-  /** Called when the summary's BOARD button is opened for the first time. */
+  /** Called when the summary's BOARD button reopens the board. */
   onBoardRequested?: () => void;
+  /** Called when the summary has been left alone long enough to go idle. */
+  onIdle?: () => void;
 
   private muted = false;
   /** The clock the time meter measures itself against, so bonuses read right. */
   private timeReference = 60;
-  /** Summary hint for the board-closed state, restored when it closes again. */
-  private closedHint = "";
+  private idleTimer: number | null = null;
 
   constructor() {
     this.button.addEventListener("click", () => this.onAction?.());
@@ -124,11 +129,21 @@ export class Hud {
       const opening = this.summaryBoard.classList.contains("hidden");
       this.summaryBoard.classList.toggle("hidden", !opening);
       this.boardButton.textContent = opening ? "HIDE" : "BOARD";
-      // The hint points at the BOARD button, so it would be telling the
-      // player to do the thing they have just done. Put it back on close.
-      this.summaryHint.textContent = opening ? "" : this.closedHint;
       if (opening) this.onBoardRequested?.();
     });
+
+    // Any sign of a person resets the countdown back to the attract screen.
+    // Pointer movement counts: someone at a laptop is still here even if they
+    // have not clicked anything.
+    for (const event of ["pointerdown", "pointermove", "keydown", "wheel"]) {
+      window.addEventListener(
+        event,
+        () => {
+          if (!this.summaryScreen.classList.contains("hidden")) this.armIdleReturn();
+        },
+        { passive: true }
+      );
+    }
 
     this.muteButton.addEventListener("click", () => {
       this.muted = !this.muted;
@@ -270,17 +285,21 @@ export class Hud {
     this.summaryScreen.classList.add("hidden");
     this.hud.classList.add("hidden");
     this.setTposeProgress(0);
+    this.clearIdleReturn();
   }
 
   /** The first screen: nothing has been switched on yet. */
   intro() {
-    this.showTitle({
-      top: "HORNBILL",
-      bottom: "FLIGHT",
-      button: "START",
-      hint: "Uses your webcam and plays sound. Nothing recorded leaves your device.",
-      controls: true,
-    });
+    this.showTitle({ top: "HORNBILL", bottom: "FLIGHT", button: "START", controls: true });
+  }
+
+  /**
+   * Attract mode: the title again, once the summary has been left alone. The
+   * camera is already running by now, so the button launches straight into a
+   * run rather than starting anything up.
+   */
+  attract() {
+    this.showTitle({ top: "HORNBILL", bottom: "FLIGHT", button: "START", controls: true });
   }
 
   error(message: string) {
@@ -315,6 +334,7 @@ export class Hud {
     this.summaryScreen.classList.add("hidden");
     this.hud.classList.remove("hidden");
     this.setTposeProgress(0);
+    this.clearIdleReturn();
   }
 
   /** The run summary. */
@@ -334,64 +354,78 @@ export class Hud {
     this.statAirtime.textContent = `${Math.round(stats.airtimeSeconds)}s`;
     this.statCombo.textContent = `x${stats.bestCombo}`;
 
-    const hasRank = typeof stats.rank === "number";
-    this.ribbon.classList.toggle("hidden", !hasRank);
-    if (hasRank) {
-      this.ribbonRank.textContent = `#${stats.rank}`;
-      this.ribbonMessage.textContent = stats.rankMessage ?? "";
-    }
+    this.setRank(stats.rank, stats.rankMessage);
 
-    // The board starts closed on every run, so the button and panel cannot
-    // disagree about which state they are in.
-    this.summaryBoard.classList.add("hidden");
-    this.boardButton.textContent = "BOARD";
+    // The board opens with the screen -- the summary is the only place it
+    // appears now, so hiding it behind a button would make it easy to never
+    // see. The button and panel are reset together so they cannot disagree.
+    this.summaryBoard.classList.remove("hidden");
+    this.boardButton.textContent = "HIDE";
     this.hideScoreForm();
+
+    this.armIdleReturn();
+  }
+
+  /* ---------------- Attract countdown ---------------- */
+
+  private armIdleReturn() {
+    this.clearIdleReturn();
+    this.idleTimer = window.setTimeout(() => {
+      this.idleTimer = null;
+      this.onIdle?.();
+    }, IDLE_RETURN_MS);
+  }
+
+  private clearIdleReturn() {
+    if (this.idleTimer !== null) window.clearTimeout(this.idleTimer);
+    this.idleTimer = null;
   }
 
   setSummaryHint(message: string) {
-    this.closedHint = message;
     this.summaryHint.textContent = message;
+  }
+
+  /**
+   * Show, update or drop the rank ribbon. Called once from `summary()` with
+   * whatever placement was already known, and again when a fresh board lands.
+   */
+  setRank(rank?: number, message?: string) {
+    const hasRank = typeof rank === "number";
+    this.ribbon.classList.toggle("hidden", !hasRank);
+    if (!hasRank) return;
+    this.ribbonRank.textContent = `#${rank}`;
+    this.ribbonMessage.textContent = message ?? "";
   }
 
   /* ---------------- Leaderboard ---------------- */
 
   /**
-   * Render the board. It appears in two places — the title screen and behind
-   * the summary's BOARD button — which share one renderer so they can never
-   * drift apart.
+   * Render the board, which lives on the run summary and nowhere else. Its
+   * visibility belongs to the BOARD button rather than to whether there is
+   * data, so this only ever fills it in.
    */
   setLeaderboard(view: BoardView) {
-    for (const target of [
-      { panel: this.boardPanel, list: this.boardList, note: this.boardNote },
-      { panel: this.summaryBoard, list: this.summaryBoardList, note: this.summaryBoardNote },
-    ]) {
-      // The summary board's visibility belongs to the BOARD button, not to
-      // whether there is data; only the title panel hides itself here.
-      if (target.panel === this.boardPanel) {
-        target.panel.classList.toggle("hidden", view.kind === "hidden");
-      }
-      if (view.kind === "hidden") continue;
+    if (view.kind === "hidden") return;
 
-      target.list.replaceChildren();
+    this.summaryBoardList.replaceChildren();
 
-      if (view.kind === "loading") {
-        target.note.textContent = "Loading…";
-        continue;
-      }
-      if (view.kind === "error") {
-        target.note.textContent = view.message;
-        continue;
-      }
-      if (view.entries.length === 0) {
-        target.note.textContent = "No runs posted yet. Be the first.";
-        continue;
-      }
-
-      target.note.textContent = "";
-      view.entries.forEach((entry, i) => {
-        target.list.append(this.buildRow(entry, i + 1, entry.id === view.highlightId));
-      });
+    if (view.kind === "loading") {
+      this.summaryBoardNote.textContent = "Loading…";
+      return;
     }
+    if (view.kind === "error") {
+      this.summaryBoardNote.textContent = view.message;
+      return;
+    }
+    if (view.entries.length === 0) {
+      this.summaryBoardNote.textContent = "No runs posted yet. Be the first.";
+      return;
+    }
+
+    this.summaryBoardNote.textContent = "";
+    view.entries.forEach((entry, i) => {
+      this.summaryBoardList.append(this.buildRow(entry, i + 1, entry.id === view.highlightId));
+    });
   }
 
   /**
@@ -438,7 +472,6 @@ export class Hud {
 
   /** A line above the board, for "Posted as X" and for submit failures. */
   setBoardNote(message: string) {
-    this.boardNote.textContent = message;
     this.summaryBoardNote.textContent = message;
   }
 }
