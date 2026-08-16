@@ -272,12 +272,18 @@ export class Hud {
     button: string;
     hint?: string;
     controls: boolean;
+    /** Title and attract only: a big wordmark dropped down over the bird. */
+    hero?: boolean;
   }) {
     this.titleTop.textContent = opts.top;
     this.titleBottom.textContent = opts.bottom;
     this.titleMessage.textContent = opts.message ?? "";
     this.titleHint.textContent = opts.hint ?? "";
     this.controls.classList.toggle("hidden", !opts.controls);
+    // The ready screen reuses this wordmark for "READY TO FLY" above a full
+    // column of chips, so the oversized treatment is opt-in rather than the
+    // default -- there is no room for it there.
+    this.titleScreen.classList.toggle("hero", opts.hero === true);
     this.button.textContent = opts.button;
     this.button.disabled = false;
 
@@ -297,16 +303,23 @@ export class Hud {
    * wordmark and one button, with the bird visible behind it.
    */
   intro() {
-    this.showTitle({ top: "HORNBILL", bottom: "FLIGHT", button: "START", controls: false });
+    this.showTitle({ top: "HORNBILL", bottom: "FLIGHT", button: "START", controls: false, hero: true });
   }
 
   /**
-   * Attract mode: the title again, once the summary has been left alone. The
-   * camera is already running by now, so the button launches straight into a
-   * run rather than starting anything up.
+   * The title with the camera already live: after a run once the summary has
+   * been left alone, or on load when permission was granted previously. A
+   * T-pose launches from here, so it is worth saying so.
    */
-  attract() {
-    this.showTitle({ top: "HORNBILL", bottom: "FLIGHT", button: "START", controls: false });
+  attract(poseAvailable: boolean) {
+    this.showTitle({
+      top: "HORNBILL",
+      bottom: "FLIGHT",
+      button: "START",
+      hint: poseAvailable ? "Hold a T-pose to fly, or press START." : "",
+      controls: false,
+      hero: true,
+    });
   }
 
   error(message: string) {

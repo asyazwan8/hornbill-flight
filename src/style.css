@@ -561,6 +561,36 @@ body {
   text-align: center;
 }
 
+/*
+ * Title and attract screens only. With nothing between the wordmark and the
+ * button, the logo goes far bigger and drops down to meet the hornbill
+ * instead of sitting stranded against the top edge.
+ *
+ * These are the one place in the stylesheet measured in vh rather than rem.
+ * The bird is drawn by the chase camera at a fixed fraction of the viewport
+ * height, while the rem scale is clamped at both ends -- so a rem-sized logo
+ * slides around relative to the bird as the window changes shape (measured:
+ * its baseline sat at 43% of the height at 960x540 but 36% at 1280x800).
+ * Sized in vh, logo and bird keep the same relationship at any size.
+ */
+#title-screen.hero {
+  padding-top: 13vh;
+}
+
+#title-screen.hero .wordmark-top {
+  font-size: 21vh;
+}
+
+#title-screen.hero .wordmark-bottom {
+  font-size: 12.5vh;
+}
+
+/* Lifted clear of the bottom edge so it reads as part of the composition
+   rather than something stuck to the frame. */
+#title-screen.hero .title-action {
+  margin-bottom: 11vh;
+}
+
 .wordmark-top {
   font-family: var(--display);
   font-size: 4.625rem;
