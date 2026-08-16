@@ -40,7 +40,7 @@ button.
 | **Flap** — swing both arms down    | A beat of lift. Stop and you sink into the trees |
 | **Lean** — tilt your shoulders     | Banks and turns the bird                       |
 | **Hands together** — in front of you | Tucks the wings into a divebomb: fast descent, extra speed |
-| **T-pose** — arms straight out, 1s | Launches a run from the ready screen           |
+| **T-pose** — arms straight out, 1s | Launches a run, from the ready screen or after one ends |
 
 Stand back far enough that your head, both hands and your hips are all in frame.
 The preview in the bottom-left corner shows the skeleton the game is reading, so
@@ -52,9 +52,14 @@ current course would run you through a star.
 Fly too low and you hit a tree, which ends the run on the spot. Stars sit just
 above the treetops, so the tempting ones are the risky ones.
 
-When the run ends you must press **Fly again** to go round again. That is
-deliberate: you have just finished flapping, and a stray pose should not throw
-you straight back into a run.
+When the run ends you can go again either way: press **Fly again**, or hold
+another **T-pose**. The T-pose is ignored for the first couple of seconds so
+that a player who has just been flapping does not get thrown back into a run
+before they have read their score — hold the pose through that pause and it
+launches the moment it lifts, with no need to re-pose.
+
+Note that flying straight into the next run this way skips posting your score
+to the leaderboard, which needs the button.
 
 Keyboard controls work at the same time, which is handy for development:
 **Space** to flap, **arrow keys** to steer, **down arrow** (or Shift) to
@@ -191,7 +196,9 @@ Every threshold worth touching is a named constant at the top of
 | `TPOSE_HOLD`       | How long the T-pose must be held                          |
 | `DIVE_GAP_FULL/NONE` | How close your hands must be to trigger a full divebomb |
 
-Flight feel — gravity, lift per flap, turn rate — lives in `src/game/Flight.ts`.
+Flight feel — gravity, lift per flap, turn rate — lives in `src/game/Flight.ts`,
+along with `RESTART_ARM_DELAY` in `src/game/Game.ts` for how long the game over
+screen ignores a T-pose.
 How forgiving star pickups are lives in `src/game/Stars.ts`: `COLLECT_RADIUS`
 for the pickup itself, and `MAGNET_RADIUS` / `MAGNET_RATE` for the pull that
 draws a near miss in.

@@ -125,7 +125,7 @@ async function main() {
         lastRun = { stars: score, durationSeconds: game.runSeconds };
         // Drawn before the best score is updated, so "New best!" compares
         // against the score to beat rather than the one just set.
-        hud.gameover(score, best, game.crashed);
+        hud.gameover(score, best, game.crashed, poseAvailable);
         if (score > best) {
           best = score;
           writeBest(best);

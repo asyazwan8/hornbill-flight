@@ -205,7 +205,7 @@ export class Hud {
     this.setTposeProgress(0);
   }
 
-  gameover(score: number, best: number, crashed: boolean) {
+  gameover(score: number, best: number, crashed: boolean, poseAvailable = false) {
     const noun = score === 1 ? "star" : "stars";
     const note =
       score >= best && score > 0
@@ -218,7 +218,14 @@ export class Hud {
       `<div class="score-big">${score}</div><div>${noun} collected</div>${note}`,
       {
         button: "Fly again",
-        hint: crashed ? "You flew into the canopy. Keep flapping to stay above the trees." : "",
+        // Both routes are worth naming: the button for anyone at a desk, the
+        // T-pose for the player who is stood back and never touching a mouse.
+        hint: [
+          crashed ? "You flew into the canopy. Keep flapping to stay above the trees." : "",
+          poseAvailable ? "Hold a T-pose to fly again, or press the button." : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
       }
     );
     this.setTposeProgress(0);

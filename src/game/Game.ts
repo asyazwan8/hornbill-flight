@@ -61,6 +61,17 @@ const AIM_SAMPLES = 16;
 const CALL_MIN_GAP = 7;
 const CALL_MAX_GAP = 17;
 
+/**
+ * How long after a run ends before a T-pose can launch the next one.
+ *
+ * Restarting used to be button-only, on the grounds that a player who has
+ * just been flapping should not be thrown back into a run by a stray pose.
+ * The pause keeps that protection while still letting the game be played
+ * without touching anything: long enough to read your score, short enough
+ * that going again never feels like queuing.
+ */
+const RESTART_ARM_DELAY = 2.5;
+
 /** Slightly wider than the pickup radius, so the lock leads the catch. */
 const STAR_LOCK_RADIUS = 10;
 
@@ -96,6 +107,8 @@ export class Game {
   private untilCall = 4;
   /** Set when the run ended by flying into something rather than running out. */
   crashed = false;
+  /** Time on the game over screen, which arms the T-pose restart. */
+  private sinceGameOver = 0;
 
   private aimPath: THREE.Vector3[] = [];
   private aimPoint = new THREE.Vector3();
@@ -163,6 +176,11 @@ export class Game {
 
   private endRun(crashed = false) {
     this.crashed = crashed;
+    this.sinceGameOver = 0;
+    // Drain and discard whatever was latched during the run. Arms go wide
+    // often enough in normal flight that a T-pose can complete in mid-air,
+    // and that must never read as asking to go again.
+    this.input?.startRequested();
     if (crashed) this.events.onCrash?.();
     this.setPhase("gameover");
   }
@@ -225,11 +243,16 @@ export class Game {
       // Idle: the bird drifts on a slow circle so the menu has something alive
       // behind it, and we watch for the player's start signal.
       this.flight.update(dt, { flap: this.idleFlap(dt), steer: 0.32, dive: 0 });
-      // The latch is always drained, but only honoured on the intro screen.
-      // After a run the player has just been posing and flapping, so a stray
-      // T-pose must not relaunch them — the Fly again button is the only way.
-      const requested = this.input?.startRequested() ?? false;
-      if (requested && this.phase === "waiting") this.startRun();
+
+      if (this.phase === "gameover") this.sinceGameOver += dt;
+
+      // A T-pose launches from either screen, but not for a moment after a
+      // run ends. During that pause the latch is deliberately left alone
+      // rather than drained, so a pose struck while the score is still up
+      // counts the instant the pause expires instead of being swallowed —
+      // anything stale from the run itself was cleared in endRun.
+      const armed = this.phase === "waiting" || this.sinceGameOver >= RESTART_ARM_DELAY;
+      if (armed && this.input?.startRequested()) this.startRun();
     } else if (this.phase === "playing") {
       const input: FlightInput = this.input ? this.input.sample(dt) : NO_INPUT;
       const flapped = this.flight.update(dt, input);
