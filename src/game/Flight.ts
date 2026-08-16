@@ -33,7 +33,7 @@ const MAX_PITCH_DIVE = 0.95;
  */
 export const START_ALTITUDE = 55;
 export const GROUND_Y = 5;
-const MAX_ALTITUDE = 135;
+export const MAX_ALTITUDE = 135;
 
 /** Seconds without a flap before the bird counts as gliding. */
 const GLIDE_AFTER = 0.55;

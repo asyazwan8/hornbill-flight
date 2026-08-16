@@ -2,8 +2,8 @@ import * as THREE from "three";
 import { World, FOG_COLOR } from "./World";
 import { Hornbill } from "./Hornbill";
 import { Stars } from "./Stars";
-import { Flight, GROUND_Y } from "./Flight";
-import { NO_INPUT, damp, type FlightInput, type GamePhase } from "./types";
+import { Flight, GROUND_Y, MAX_ALTITUDE } from "./Flight";
+import { NO_INPUT, clamp, damp, type FlightInput, type GamePhase } from "./types";
 
 export const ROUND_SECONDS = 60;
 
@@ -29,6 +29,8 @@ export type GameEvents = {
   onTime?: (secondsLeft: number) => void;
   /** A star was picked up. `streak` counts stars collected in quick succession. */
   onCollect?: (streak: number) => void;
+  /** How high the bird is flying, 0 at the treetops to 1 at the ceiling. */
+  onAltitude?: (fraction: number) => void;
   /** A wingbeat actually took effect, 0..1 strength. */
   onFlap?: (strength: number) => void;
   /** Bonus time awarded, in seconds. */
@@ -102,6 +104,10 @@ export class Game {
 
   private streak = 0;
   private sinceCollect = 99;
+  /** The longest chain of the current run, as a multiplier. */
+  bestCombo = 1;
+  /** Only redraw the altitude meter when it actually moves a pixel. */
+  private lastAltitudePercent = -1;
   /** Stars collected since the last time bonus was awarded. */
   private towardBonus = 0;
   private untilCall = 4;
@@ -163,6 +169,8 @@ export class Game {
     this.lastWholeSecond = ROUND_SECONDS;
     this.streak = 0;
     this.sinceCollect = 99;
+    this.bestCombo = 1;
+    this.lastAltitudePercent = -1;
     this.towardBonus = 0;
     this.untilCall = 4;
     this.crashed = false;
@@ -271,6 +279,9 @@ export class Game {
         this.sinceCollect = 0;
         this.events.onScore?.(this.score);
         this.events.onCollect?.(this.streak);
+        // The streak counts *extra* stars in the chain, so the multiplier the
+        // player is shown is one more than that.
+        this.bestCombo = Math.max(this.bestCombo, this.streak + 1);
 
         // Every few stars buys more time, which is what turns a fixed minute
         // into a run that good flying can keep alive.
@@ -288,6 +299,15 @@ export class Game {
         this.world.hitsTree(this.flight.position, BIRD_RADIUS)
       ) {
         this.endRun(true);
+      }
+
+      // Height above the canopy as a fraction of the reachable ceiling, which
+      // is what the altitude meter and its low-altitude alarm read.
+      const altitude = clamp((this.flight.position.y - GROUND_Y) / (MAX_ALTITUDE - GROUND_Y), 0, 1);
+      const altitudePercent = Math.round(altitude * 100);
+      if (altitudePercent !== this.lastAltitudePercent) {
+        this.lastAltitudePercent = altitudePercent;
+        this.events.onAltitude?.(altitude);
       }
 
       this.untilCall -= dt;

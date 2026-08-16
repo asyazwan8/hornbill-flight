@@ -1,10 +1,12 @@
 import "./style.css";
-import { Game, type InputSource } from "./game/Game";
+import { Game, STARS_PER_BONUS, ROUND_SECONDS, type InputSource } from "./game/Game";
 import type { FlightInput } from "./game/types";
 import { Hud } from "./ui/Hud";
 import { KeyboardInput } from "./input/Keyboard";
 import { PoseInput } from "./pose/PoseInput";
 import { GameAudio } from "./audio/Audio";
+import type { SummaryStats } from "./ui/Hud";
+import type { LeaderboardEntry } from "./leaderboard/Leaderboard";
 import {
   PREFLIGHT_ROWS,
   TOP_N,
@@ -76,6 +78,8 @@ async function main() {
   // a token and a stale response is dropped rather than drawn over a screen
   // that has already moved on.
   let boardToken = 0;
+  /** Last board read, kept so a rank can be worked out without a round trip. */
+  let boardCache: LeaderboardEntry[] | null = null;
 
   /**
    * Fetch and draw the board. Failure is not an error the player needs to act
@@ -88,6 +92,7 @@ async function main() {
     try {
       const entries = await fetchTop(TOP_N);
       if (token !== boardToken) return;
+      boardCache = entries;
       hud.setLeaderboard({ kind: "entries", entries: entries.slice(0, rows), highlightId });
     } catch (err) {
       if (token !== boardToken) return;
@@ -96,13 +101,50 @@ async function main() {
     }
   };
 
+  /**
+   * Where this run would sit on the board, for the summary's rank ribbon.
+   *
+   * Worked out against the cached top ten rather than by asking the server,
+   * because the ribbon has to be on screen the instant the run ends. A run
+   * that beats nobody in a full top ten is simply off the board, and says so
+   * instead of claiming an eleventh place it cannot actually know.
+   */
+  const placement = (stars: number, duration: number): Partial<SummaryStats> => {
+    if (!leaderboardConfigured() || !boardCache || boardCache.length === 0) return {};
+
+    const better = boardCache.filter(
+      (e) => e.stars > stars || (e.stars === stars && e.duration_seconds > duration)
+    ).length;
+    const rank = better + 1;
+    if (rank > boardCache.length && boardCache.length >= TOP_N) return {};
+
+    const leader = boardCache[0];
+    if (rank === 1) return { rank, rankMessage: "Top of the board — nobody has flown better" };
+
+    const gap = leader.stars - stars;
+    return {
+      rank,
+      rankMessage:
+        gap > 0
+          ? `${gap} star${gap === 1 ? "" : "s"} off ${leader.name}`
+          : `Just behind ${leader.name}`,
+    };
+  };
+
   const game = new Game(canvas, {
     onScore: (s) => hud.setScore(s),
     onTime: (t) => hud.setTime(t),
-    onCollect: (streak) => audio.star(streak),
+    onAltitude: (fraction) => hud.setAltitude(fraction),
+    onCollect: (streak) => {
+      audio.star(streak);
+      hud.popScore();
+      // The streak counts extra stars in the chain; the player is shown the
+      // multiplier, which is one more.
+      hud.flashCombo(streak + 1);
+    },
     onFlap: (strength) => audio.flap(strength),
     onBonus: (seconds) => {
-      hud.flashBonus(seconds);
+      hud.flashBonus(seconds, STARS_PER_BONUS);
       audio.bonus();
     },
     onCrash: () => audio.crash(),
@@ -115,6 +157,9 @@ async function main() {
         void loadBoard(PREFLIGHT_ROWS);
       } else if (phase === "playing") {
         stage = "waiting";
+        hud.setTimeReference(ROUND_SECONDS);
+        hud.setScore(0);
+        hud.setTime(ROUND_SECONDS);
         hud.playing();
         poseInput?.reset();
         audio.launch();
@@ -123,17 +168,25 @@ async function main() {
         audio.gameOver();
         const score = game.score;
         lastRun = { stars: score, durationSeconds: game.runSeconds };
-        // Drawn before the best score is updated, so "New best!" compares
-        // against the score to beat rather than the one just set.
-        hud.gameover(score, best, game.crashed, poseAvailable);
         if (score > best) {
           best = score;
           writeBest(best);
         }
 
-        // A scoreless run has nothing worth posting, but the board is still
-        // worth showing: it is what the player is trying to get onto.
-        if (score > 0 && leaderboardConfigured()) hud.showScoreForm(readName());
+        hud.summary({
+          stars: score,
+          airtimeSeconds: game.runSeconds,
+          bestCombo: game.bestCombo,
+          crashed: game.crashed,
+          ...placement(score, game.runSeconds),
+        });
+        hud.setSummaryHint(
+          leaderboardConfigured()
+            ? "Press BOARD to post this run." + (poseAvailable ? " Or hold a T-pose to fly again." : "")
+            : poseAvailable
+              ? "Hold a T-pose to fly again."
+              : ""
+        );
         void loadBoard(TOP_N);
       }
     },
@@ -143,6 +196,14 @@ async function main() {
   game.run();
 
   hud.onMuteToggle = (muted) => audio.setMuted(muted);
+
+  // The name field lives behind the BOARD button, so it is only built when
+  // the player actually asks to see the board. A scoreless run has nothing
+  // worth posting, but the board is still worth reading.
+  hud.onBoardRequested = () => {
+    if (lastRun && lastRun.stars > 0 && leaderboardConfigured()) hud.showScoreForm(readName());
+    void loadBoard(TOP_N);
+  };
 
   hud.onSubmitScore = async (rawName) => {
     if (!lastRun) return;

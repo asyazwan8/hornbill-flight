@@ -14,10 +14,49 @@
     <video id="webcam" playsinline autoplay muted></video>
 
     <div id="ui">
-      <!-- Heads up display, visible while flying -->
+      <!-- ============ In-flight HUD ============ -->
       <div id="hud" class="hidden">
-        <div class="hud-stat" id="hud-timer"><span class="label">TIME</span><span class="value">60</span></div>
-        <div class="hud-stat" id="hud-score"><span class="label">STARS</span><span class="value">0</span></div>
+        <div class="hud-left">
+          <div class="star-counter" id="hud-score">
+            <div class="star-gem" aria-hidden="true"></div>
+            <span class="value">0</span>
+          </div>
+
+          <div class="meter-panel" id="hud-timer">
+            <div class="meter-head">
+              <span class="meter-label">TIME</span>
+              <span class="value">1:00</span>
+            </div>
+            <div class="meter-track"><div class="meter-fill time-fill"></div></div>
+          </div>
+
+          <div class="meter-panel" id="hud-altitude">
+            <div class="meter-head">
+              <span class="meter-label">ALTITUDE</span>
+              <span class="value">HIGH</span>
+            </div>
+            <div class="meter-track"><div class="meter-fill alt-fill"></div></div>
+          </div>
+        </div>
+
+        <!-- Combo shout. One at a time, by design. -->
+        <div id="combo" class="combo" aria-hidden="true"></div>
+
+        <!-- Bonus time toast -->
+        <div id="bonus" class="toast">
+          <span class="toast-gain"></span>
+          <span class="toast-note">stars banked — clock extended</span>
+        </div>
+      </div>
+
+      <!-- Pose preview, top right. Lives outside #hud so it can stay up on the
+           ready screen while the player is lining themselves up. -->
+      <div id="preview" class="hidden">
+        <div class="preview-frame">
+          <canvas id="overlay"></canvas>
+          <div id="track-pill" class="track-pill"><span class="dot"></span><span class="track-text">TRACKING</span></div>
+        </div>
+        <div id="pose-status">LOOKING FOR YOU</div>
       </div>
 
       <!-- Aiming cross, positioned each frame from the projected flight path -->
@@ -32,58 +71,75 @@
         </svg>
       </div>
 
-      <!-- Bonus time flash -->
-      <div id="bonus" class="bonus"></div>
-
-      <!-- Pose preview with skeleton overlay -->
-      <div id="preview" class="hidden">
-        <canvas id="overlay"></canvas>
-        <div id="pose-status">Looking for you…</div>
-      </div>
-
       <button id="mute" class="icon-btn" aria-label="Mute sound" aria-pressed="false">🔊</button>
 
-      <!-- Full screen panels -->
-      <div id="panel" class="panel">
-        <div class="panel-inner">
-          <h1 id="panel-title">Hornbill Flight</h1>
-          <p id="panel-body">Loading…</p>
-          <div id="tpose-meter" class="meter hidden"><div class="meter-fill"></div></div>
-          <ul id="panel-help" class="help hidden">
-            <li><b>Flap</b> — swing both arms down to gain height</li>
-            <li><b>Lean</b> — tilt your shoulders left or right to steer</li>
-            <li><b>Hands together</b> — tuck your wings and divebomb</li>
-            <li><b>T-pose</b> — hold both arms straight out to launch</li>
-          </ul>
-          <p class="rules">Stop flapping and you sink into the trees. Every 3 stars buys 10 more seconds.</p>
+      <!-- ============ Title / ready screen ============ -->
+      <div id="title-screen" class="screen hidden">
+        <div class="wordmark">
+          <div class="wordmark-top" id="title-top">HORNBILL</div>
+          <div class="wordmark-bottom" id="title-bottom">FLIGHT</div>
+        </div>
 
-          <!-- Online leaderboard. Hidden whenever no Supabase project is
-               configured, which is the normal state for local development. -->
-          <section id="leaderboard" class="leaderboard hidden" aria-live="polite">
-            <h2 class="leaderboard-title">Leaderboard</h2>
+        <p id="title-message" class="title-message"></p>
 
-            <form id="score-form" class="score-form hidden">
-              <label class="sr-only" for="player-name">Your name</label>
-              <input
-                id="player-name"
-                class="name-input"
-                type="text"
-                maxlength="16"
-                placeholder="Your name"
-                autocomplete="nickname"
-                spellcheck="false"
-              />
-              <button id="submit-score" class="btn-small" type="submit">Submit</button>
-            </form>
+        <ul id="controls" class="chips">
+          <li class="chip"><span class="swatch swatch-flap"></span><span class="chip-text"><b>FLAP</b> swing arms down</span></li>
+          <li class="chip"><span class="swatch swatch-lean"></span><span class="chip-text"><b>LEAN</b> tilt to steer</span></li>
+          <li class="chip"><span class="swatch swatch-dive"></span><span class="chip-text"><b>HANDS TOGETHER</b> divebomb</span></li>
+          <li class="chip"><span class="swatch swatch-tpose"></span><span class="chip-text"><b>T-POSE</b> launch</span></li>
+        </ul>
 
-            <p id="leaderboard-note" class="leaderboard-note"></p>
-            <ol id="leaderboard-list" class="leaderboard-list"></ol>
+        <div class="title-bottom-row">
+          <section id="board-panel" class="board hidden">
+            <h2 class="board-title">TOP FLYERS</h2>
+            <p id="board-note" class="board-note"></p>
+            <ol id="board-list" class="board-list"></ol>
           </section>
 
-          <div class="actions">
-            <button id="primary-btn" class="btn hidden">Start</button>
+          <div class="title-action">
+            <div id="tpose-meter" class="tpose-meter hidden"><div class="tpose-fill"></div></div>
+            <button id="primary-btn" class="crate-btn">START</button>
+            <p id="title-hint" class="title-hint"></p>
           </div>
-          <p id="panel-hint" class="hint"></p>
+        </div>
+      </div>
+
+      <!-- ============ Run summary ============ -->
+      <div id="summary-screen" class="screen summary hidden">
+        <div class="rays" aria-hidden="true"></div>
+        <div class="summary-card">
+          <h1 id="summary-title">FLIGHT OVER</h1>
+          <p id="summary-subtitle" class="summary-subtitle"></p>
+
+          <div class="stat-tiles">
+            <div class="tile tile-stars"><div class="tile-value" id="stat-stars">0</div><div class="tile-label">STARS</div></div>
+            <div class="tile"><div class="tile-value" id="stat-airtime">0s</div><div class="tile-label">AIRTIME</div></div>
+            <div class="tile"><div class="tile-value tile-mint" id="stat-combo">x1</div><div class="tile-label">BEST COMBO</div></div>
+          </div>
+
+          <div id="rank-ribbon" class="ribbon hidden">
+            <div class="ribbon-rank" id="ribbon-rank">#1</div>
+            <div class="ribbon-message" id="ribbon-message"></div>
+          </div>
+
+          <div class="summary-actions">
+            <button id="again-btn" class="crate-btn">FLY AGAIN</button>
+            <button id="board-btn" class="crate-btn crate-btn-ghost">BOARD</button>
+          </div>
+
+          <!-- Revealed by the BOARD button: the full leaderboard plus the
+               name field, which is the only way a run gets posted. -->
+          <div id="summary-board" class="summary-board hidden">
+            <form id="score-form" class="score-form hidden">
+              <label class="sr-only" for="player-name">Your name</label>
+              <input id="player-name" class="name-input" type="text" maxlength="16" placeholder="Your name" autocomplete="nickname" spellcheck="false" />
+              <button id="submit-score" class="crate-btn crate-btn-small" type="submit">POST</button>
+            </form>
+            <p id="summary-board-note" class="board-note"></p>
+            <ol id="summary-board-list" class="board-list"></ol>
+          </div>
+
+          <p id="summary-hint" class="title-hint"></p>
         </div>
       </div>
     </div>
