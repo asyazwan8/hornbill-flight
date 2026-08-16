@@ -76,13 +76,19 @@ everything.
 The UI is built to a design handoff — a chunky tropical-arcade direction, in
 the spirit of a mid-90s mascot platformer — across three screens:
 
-- **Title** — the wordmark and START at the foot of the screen, and nothing
-  else: the gestures are taught on the ready screen, at the point they become
-  usable, so the title stays a title with the bird visible behind it. It
-  doubles as the attract screen — leave the run summary alone for 15 seconds
-  and the game drops back here, so the next person to walk up finds the title
-  rather than a stranger's score. Any pointer move or keypress restarts that
-  countdown.
+- **Title** — an oversized wordmark dropped down to meet the bird, with START
+  below it and nothing else: the gestures are taught on the ready screen, at
+  the point they become usable. It doubles as the attract screen — leave the
+  run summary alone for 15 seconds and the game drops back here, so the next
+  person to walk up finds the title rather than a stranger's score. Any
+  pointer move or keypress restarts that countdown.
+
+  Once the camera is running, a **T-pose launches straight from this screen**,
+  so a player stood across the room never has to touch anything. On a machine
+  that has run the game before — where camera permission is already granted —
+  the pose stack comes up on load without waiting for a click, which is what
+  makes that true of a cold page too. A first visit still shows only START:
+  the permission dialog appears behind a deliberate press, never on its own.
 - **Ready to fly** — the four body controls as chips, FLY NOW at the foot, and
   the keyboard fallback in small print beneath it.
 - **In-flight HUD** — a star counter that pops on every pickup, a countdown,

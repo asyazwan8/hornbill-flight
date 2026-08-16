@@ -70,6 +70,12 @@ async function main() {
   let best = readBest();
   /** What the action button does right now. */
   let stage: "intro" | "waiting" | "gameover" = "intro";
+  /**
+   * Set when the player pressed START, which is what earns the coaching
+   * screen. A camera that came up on its own leaves the title in place, so a
+   * kiosk shows its title rather than an instruction panel nobody asked for.
+   */
+  let coachingRequested = false;
   /** The finished run the submit button would post, captured at game over. */
   let lastRun: { stars: number; durationSeconds: number } | null = null;
 
@@ -152,7 +158,8 @@ async function main() {
     onPhase: (phase) => {
       if (phase === "waiting") {
         stage = "waiting";
-        hud.waiting(poseAvailable);
+        if (coachingRequested) hud.waiting(poseAvailable);
+        else hud.attract(poseAvailable);
       } else if (phase === "playing") {
         stage = "waiting";
         hud.setTimeReference(ROUND_SECONDS);
@@ -205,7 +212,7 @@ async function main() {
   // Nobody has touched the summary for a while, so put the title back up for
   // whoever walks up next. The run itself is already over -- this only swaps
   // the screen, so a T-pose still launches straight from here.
-  hud.onIdle = () => hud.attract();
+  hud.onIdle = () => hud.attract(poseAvailable);
 
   hud.onSubmitScore = async (rawName) => {
     if (!lastRun) return;
@@ -227,8 +234,27 @@ async function main() {
     }
   };
 
+  /** Bring the pose stack up. Safe to call twice; the second is a no-op. */
+  const startPose = async () => {
+    if (poseInput) return;
+    const pose = new PoseInput(video, hud.overlayCanvas);
+    await pose.init();
+    poseInput = pose;
+    poseAvailable = true;
+
+    pose.onUpdate = (status, message, progress) => {
+      hud.setPoseStatus(status, message);
+      if (game.phase !== "playing") hud.setTposeProgress(progress);
+    };
+    pose.onDive = () => audio.dive();
+
+    hud.showPreview();
+    game.setInputSource(new CombinedInput([pose, keyboard]));
+  };
+
   /** Everything that needs a user gesture: audio unlock, then the camera. */
   const enableAndStart = async () => {
+    coachingRequested = true;
     hud.setButtonBusy(true, "Starting…");
 
     // Audio first: it is instant, and doing it inside the click keeps the
@@ -241,19 +267,7 @@ async function main() {
     }
 
     try {
-      const pose = new PoseInput(video, hud.overlayCanvas);
-      await pose.init();
-      poseInput = pose;
-      poseAvailable = true;
-
-      pose.onUpdate = (status, message, progress) => {
-        hud.setPoseStatus(status, message);
-        if (game.phase !== "playing") hud.setTposeProgress(progress);
-      };
-      pose.onDive = () => audio.dive();
-
-      hud.showPreview();
-      game.setInputSource(new CombinedInput([pose, keyboard]));
+      await startPose();
     } catch (err) {
       console.error("Pose setup failed", err);
       hud.error(describeCameraError(err));
@@ -264,6 +278,37 @@ async function main() {
     }
 
     game.ready();
+  };
+
+  /**
+   * Start the camera without waiting for a click, but only where permission
+   * was already granted for this origin -- a machine that has run this before.
+   *
+   * That is what lets the title screen accept a T-pose like every other
+   * screen: a player standing across the room can walk up to a cold page and
+   * launch without touching anything. On a first visit the query comes back
+   * "prompt" and nothing happens, so the permission dialog still only ever
+   * appears behind a deliberate press of START.
+   *
+   * Audio is untouched here. Browsers will not unlock an AudioContext without
+   * a gesture, so sound waits for the first press or the first launch.
+   */
+  const startPoseIfAlreadyPermitted = async () => {
+    try {
+      const status = await navigator.permissions?.query({ name: "camera" as PermissionName });
+      if (status?.state !== "granted") return;
+    } catch {
+      // Firefox and Safari reject "camera" as a permission name. No query, no
+      // auto-start: the button still works.
+      return;
+    }
+
+    try {
+      await startPose();
+      game.ready();
+    } catch (err) {
+      console.warn("Camera was permitted but would not start", err);
+    }
   };
 
   hud.onAction = () => {
@@ -288,6 +333,7 @@ async function main() {
   // Warm the board so the first run's rank ribbon has something to rank
   // against. Nothing is on screen to show it yet; this is purely the cache.
   void loadBoard(TOP_N);
+  void startPoseIfAlreadyPermitted();
 }
 
 main();
