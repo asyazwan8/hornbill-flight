@@ -80,6 +80,8 @@ export class Game {
   phase: GamePhase = "loading";
   score = 0;
   timeLeft = ROUND_SECONDS;
+  /** How long the current run has lasted, bonus time included. */
+  runSeconds = 0;
 
   // Timer (not the deprecated Clock) also hooks the Page Visibility API, so a
   // backgrounded tab does not come back with a huge delta.
@@ -144,6 +146,7 @@ export class Game {
   startRun() {
     this.score = 0;
     this.timeLeft = ROUND_SECONDS;
+    this.runSeconds = 0;
     this.lastWholeSecond = ROUND_SECONDS;
     this.streak = 0;
     this.sinceCollect = 99;
@@ -270,6 +273,9 @@ export class Game {
         this.events.onCall?.();
       }
 
+      // The uncapped delta, matching the countdown: time survived and time
+      // remaining must add up to the time the run was granted.
+      this.runSeconds += elapsed;
       this.timeLeft = Math.max(0, this.timeLeft - elapsed);
       const whole = Math.ceil(this.timeLeft);
       if (whole !== this.lastWholeSecond) {

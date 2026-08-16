@@ -56,6 +56,30 @@
             <li><b>T-pose</b> — hold both arms straight out to launch</li>
           </ul>
           <p class="rules">Stop flapping and you sink into the trees. Every 3 stars buys 10 more seconds.</p>
+
+          <!-- Online leaderboard. Hidden whenever no Supabase project is
+               configured, which is the normal state for local development. -->
+          <section id="leaderboard" class="leaderboard hidden" aria-live="polite">
+            <h2 class="leaderboard-title">Leaderboard</h2>
+
+            <form id="score-form" class="score-form hidden">
+              <label class="sr-only" for="player-name">Your name</label>
+              <input
+                id="player-name"
+                class="name-input"
+                type="text"
+                maxlength="16"
+                placeholder="Your name"
+                autocomplete="nickname"
+                spellcheck="false"
+              />
+              <button id="submit-score" class="btn-small" type="submit">Submit</button>
+            </form>
+
+            <p id="leaderboard-note" class="leaderboard-note"></p>
+            <ol id="leaderboard-list" class="leaderboard-list"></ol>
+          </section>
+
           <div class="actions">
             <button id="primary-btn" class="btn hidden">Start</button>
           </div>

@@ -1,4 +1,12 @@
 import type { PoseStatus } from "../pose/GestureMapper";
+import type { LeaderboardEntry } from "../leaderboard/Leaderboard";
+
+/** What the leaderboard section should currently be showing. */
+export type BoardView =
+  | { kind: "hidden" }
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "entries"; entries: LeaderboardEntry[]; highlightId?: string };
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -35,12 +43,21 @@ export class Hud {
   private preview = $("preview");
   private poseStatus = $("pose-status");
 
+  private board = $("leaderboard");
+  private boardList = $<HTMLOListElement>("leaderboard-list");
+  private boardNote = $("leaderboard-note");
+  private scoreForm = $<HTMLFormElement>("score-form");
+  private nameInput = $<HTMLInputElement>("player-name");
+  private submitButton = $<HTMLButtonElement>("submit-score");
+
   readonly overlayCanvas = $<HTMLCanvasElement>("overlay");
 
   /** Called when the panel's action button is pressed. */
   onAction?: () => void;
   /** Called when the mute toggle changes. */
   onMuteToggle?: (muted: boolean) => void;
+  /** Called when the player posts their run to the leaderboard. */
+  onSubmitScore?: (name: string) => void;
 
   private muted = false;
 
@@ -55,10 +72,18 @@ export class Hud {
       this.onMuteToggle?.(this.muted);
     });
 
+    this.scoreForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      this.onSubmitScore?.(this.nameInput.value);
+    });
+
     // Enter activates whatever the panel is currently offering, so the game is
     // fully playable without reaching for the mouse.
     window.addEventListener("keydown", (e) => {
       if (e.code !== "Enter") return;
+      // Unless the player is typing their name, where Enter belongs to the
+      // form -- otherwise submitting a score would also fly again.
+      if (e.target instanceof HTMLInputElement) return;
       if (this.button.classList.contains("hidden") || this.button.disabled) return;
       e.preventDefault();
       this.onAction?.();
@@ -128,6 +153,11 @@ export class Hud {
 
     this.panel.classList.remove("hidden");
     this.hud.classList.add("hidden");
+
+    // Each screen asks for the board it wants; without this reset the previous
+    // screen's board would flash before the new fetch resolved.
+    this.setLeaderboard({ kind: "hidden" });
+    this.hideScoreForm();
   }
 
   /** The first screen: nothing has been switched on yet. */
@@ -193,5 +223,82 @@ export class Hud {
     );
     this.setTposeProgress(0);
     this.hideReticle();
+  }
+
+  /* ---------------- Leaderboard ---------------- */
+
+  /** Render the leaderboard section, or hide it entirely. */
+  setLeaderboard(view: BoardView) {
+    this.board.classList.toggle("hidden", view.kind === "hidden");
+    if (view.kind === "hidden") return;
+
+    this.boardList.replaceChildren();
+
+    if (view.kind === "loading") {
+      this.boardNote.textContent = "Loading…";
+      return;
+    }
+
+    if (view.kind === "error") {
+      this.boardNote.textContent = view.message;
+      return;
+    }
+
+    if (view.entries.length === 0) {
+      this.boardNote.textContent = "No runs posted yet. Be the first.";
+      return;
+    }
+
+    this.boardNote.textContent = "";
+    view.entries.forEach((entry, i) => {
+      this.boardList.append(this.buildRow(entry, i + 1, entry.id === view.highlightId));
+    });
+  }
+
+  /**
+   * One row, built node by node. Names come from whoever else has played, so
+   * they are set as text and never as markup.
+   */
+  private buildRow(entry: LeaderboardEntry, rank: number, isYou: boolean): HTMLLIElement {
+    const row = document.createElement("li");
+    row.className = "lb-row";
+    row.classList.toggle("is-you", isYou);
+
+    const cell = (className: string, text: string) => {
+      const el = document.createElement("span");
+      el.className = className;
+      el.textContent = text;
+      return el;
+    };
+
+    row.append(
+      cell("lb-rank", String(rank)),
+      cell("lb-name", entry.name),
+      cell("lb-stars", `${entry.stars}★`),
+      cell("lb-time", `${Math.round(entry.duration_seconds)}s`)
+    );
+    return row;
+  }
+
+  /** Offer to post the run just finished, with the last name used filled in. */
+  showScoreForm(name: string) {
+    this.nameInput.value = name;
+    this.submitButton.disabled = false;
+    this.submitButton.textContent = "Submit";
+    this.scoreForm.classList.remove("hidden");
+  }
+
+  hideScoreForm() {
+    this.scoreForm.classList.add("hidden");
+  }
+
+  setSubmitBusy(busy: boolean) {
+    this.submitButton.disabled = busy;
+    this.submitButton.textContent = busy ? "Posting…" : "Submit";
+  }
+
+  /** A line above the board, for "Posted as X" and for submit failures. */
+  setBoardNote(message: string) {
+    this.boardNote.textContent = message;
   }
 }

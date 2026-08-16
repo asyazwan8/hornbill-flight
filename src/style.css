@@ -414,3 +414,150 @@ body {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
+
+/* ---------------- Leaderboard ---------------- */
+
+.leaderboard {
+  margin: 22px auto 0;
+  width: min(420px, 100%);
+  text-align: left;
+}
+
+.leaderboard-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  opacity: 0.6;
+}
+
+.leaderboard-note {
+  margin: 0 !important;
+  padding: 6px 2px;
+  font-size: 13px !important;
+  text-align: center;
+  opacity: 0.55;
+}
+
+.leaderboard-note:empty {
+  display: none;
+}
+
+.leaderboard-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* Ten rows on a short screen would push the Fly again button out of reach,
+     so the board scrolls inside itself rather than growing the panel. */
+  max-height: 34vh;
+  overflow-y: auto;
+}
+
+.lb-row {
+  display: grid;
+  grid-template-columns: 26px 1fr auto auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 12px;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* The run just posted, so it can be picked out of the board at a glance. */
+.lb-row.is-you {
+  background: rgba(255, 204, 68, 0.15);
+  border-color: rgba(255, 204, 68, 0.5);
+}
+
+.lb-rank {
+  opacity: 0.5;
+  font-size: 12px;
+}
+
+.lb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-stars {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.lb-time {
+  opacity: 0.5;
+  font-size: 12px;
+  min-width: 42px;
+  text-align: right;
+}
+
+/* Name entry and submit, shown on the game over screen only. */
+.score-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.name-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 15px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.name-input::placeholder {
+  color: var(--paper);
+  opacity: 0.4;
+}
+
+.name-input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.btn-small {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2a1a06;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: linear-gradient(180deg, #ffd979, var(--sun));
+  transition: filter 0.12s ease;
+}
+
+.btn-small:disabled {
+  cursor: default;
+  filter: grayscale(0.55) brightness(0.85);
+}
+
+.btn-small:focus-visible {
+  outline: 3px solid #fff3d0;
+  outline-offset: 2px;
+}
+
+/* Visually hidden, but still read out by screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

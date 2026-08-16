@@ -5,6 +5,18 @@ import { Hud } from "./ui/Hud";
 import { KeyboardInput } from "./input/Keyboard";
 import { PoseInput } from "./pose/PoseInput";
 import { GameAudio } from "./audio/Audio";
+import {
+  PREFLIGHT_ROWS,
+  TOP_N,
+  cleanName,
+  fetchTop,
+  isConfigured as leaderboardConfigured,
+  readBest,
+  readName,
+  submit,
+  writeBest,
+  writeName,
+} from "./leaderboard/Leaderboard";
 
 /** Pose and keyboard at the same time; whichever moves, moves the bird. */
 class CombinedInput implements InputSource {
@@ -45,13 +57,6 @@ function describeCameraError(err: unknown): string {
   return `The pose model could not start: ${err instanceof Error ? err.message : String(err)}`;
 }
 
-const BEST_KEY = "hornbill-flight:best";
-
-function readBest(): number {
-  const raw = Number(localStorage.getItem(BEST_KEY));
-  return Number.isFinite(raw) && raw > 0 ? raw : 0;
-}
-
 async function main() {
   const canvas = document.getElementById("scene") as HTMLCanvasElement;
   const video = document.getElementById("webcam") as HTMLVideoElement;
@@ -64,6 +69,32 @@ async function main() {
   let best = readBest();
   /** What the action button does right now. */
   let stage: "intro" | "waiting" | "gameover" = "intro";
+  /** The finished run the submit button would post, captured at game over. */
+  let lastRun: { stars: number; durationSeconds: number } | null = null;
+
+  // Panels come and go faster than a request completes, so every load carries
+  // a token and a stale response is dropped rather than drawn over a screen
+  // that has already moved on.
+  let boardToken = 0;
+
+  /**
+   * Fetch and draw the board. Failure is not an error the player needs to act
+   * on -- the panel says so quietly and the local best score still stands.
+   */
+  const loadBoard = async (rows: number, highlightId?: string) => {
+    if (!leaderboardConfigured()) return;
+    const token = ++boardToken;
+    hud.setLeaderboard({ kind: "loading" });
+    try {
+      const entries = await fetchTop(TOP_N);
+      if (token !== boardToken) return;
+      hud.setLeaderboard({ kind: "entries", entries: entries.slice(0, rows), highlightId });
+    } catch (err) {
+      if (token !== boardToken) return;
+      console.warn("Leaderboard unavailable", err);
+      hud.setLeaderboard({ kind: "error", message: "Leaderboard unavailable right now." });
+    }
+  };
 
   const game = new Game(canvas, {
     onScore: (s) => hud.setScore(s),
@@ -81,6 +112,7 @@ async function main() {
       if (phase === "waiting") {
         stage = "waiting";
         hud.waiting(poseAvailable);
+        void loadBoard(PREFLIGHT_ROWS);
       } else if (phase === "playing") {
         stage = "waiting";
         hud.playing();
@@ -90,16 +122,19 @@ async function main() {
         stage = "gameover";
         audio.gameOver();
         const score = game.score;
+        lastRun = { stars: score, durationSeconds: game.runSeconds };
+        // Drawn before the best score is updated, so "New best!" compares
+        // against the score to beat rather than the one just set.
         hud.gameover(score, best, game.crashed);
         if (score > best) {
           best = score;
-          try {
-            localStorage.setItem(BEST_KEY, String(best));
-          } catch {
-            // Private browsing can refuse writes; a lost best score is not
-            // worth breaking the game over.
-          }
+          writeBest(best);
         }
+
+        // A scoreless run has nothing worth posting, but the board is still
+        // worth showing: it is what the player is trying to get onto.
+        if (score > 0 && leaderboardConfigured()) hud.showScoreForm(readName());
+        void loadBoard(TOP_N);
       }
     },
   });
@@ -108,6 +143,26 @@ async function main() {
   game.run();
 
   hud.onMuteToggle = (muted) => audio.setMuted(muted);
+
+  hud.onSubmitScore = async (rawName) => {
+    if (!lastRun) return;
+    const name = cleanName(rawName);
+    // Remembered so the next run only needs the button.
+    writeName(name);
+    hud.setSubmitBusy(true);
+    try {
+      const stored = await submit({ ...lastRun, name });
+      // Re-read rather than splicing the row in locally: other people may have
+      // posted while this run was in the air, and the server decides the order.
+      hud.hideScoreForm();
+      await loadBoard(TOP_N, stored.id);
+      hud.setBoardNote(`Posted as ${name}.`);
+    } catch (err) {
+      console.warn("Could not post score", err);
+      hud.setSubmitBusy(false);
+      hud.setBoardNote("Could not post that score. Try again?");
+    }
+  };
 
   /** Everything that needs a user gesture: audio unlock, then the camera. */
   const enableAndStart = async () => {
@@ -167,6 +222,7 @@ async function main() {
   }
 
   hud.intro();
+  void loadBoard(PREFLIGHT_ROWS);
 }
 
 main();
