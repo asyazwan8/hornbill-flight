@@ -288,9 +288,16 @@ export class Hud {
     this.clearIdleReturn();
   }
 
-  /** The first screen: nothing has been switched on yet. */
+  /**
+   * The first screen: nothing has been switched on yet.
+   *
+   * No control chips here. Nobody can act on "swing your arms down" before
+   * the camera is even running, and the ready screen teaches the gestures at
+   * the moment they become useful. Leaving them off keeps the title to a
+   * wordmark and one button, with the bird visible behind it.
+   */
   intro() {
-    this.showTitle({ top: "HORNBILL", bottom: "FLIGHT", button: "START", controls: true });
+    this.showTitle({ top: "HORNBILL", bottom: "FLIGHT", button: "START", controls: false });
   }
 
   /**
@@ -299,7 +306,7 @@ export class Hud {
    * run rather than starting anything up.
    */
   attract() {
-    this.showTitle({ top: "HORNBILL", bottom: "FLIGHT", button: "START", controls: true });
+    this.showTitle({ top: "HORNBILL", bottom: "FLIGHT", button: "START", controls: false });
   }
 
   error(message: string) {

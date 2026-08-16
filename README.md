@@ -76,11 +76,15 @@ everything.
 The UI is built to a design handoff — a chunky tropical-arcade direction, in
 the spirit of a mid-90s mascot platformer — across three screens:
 
-- **Title** — the wordmark, the four body controls as chips, and START at the
-  foot of the screen. It doubles as the attract screen: leave the run summary
-  alone for 15 seconds and the game drops back here, so the next person to
-  walk up finds the title rather than a stranger's score. Any pointer move or
-  keypress restarts that countdown.
+- **Title** — the wordmark and START at the foot of the screen, and nothing
+  else: the gestures are taught on the ready screen, at the point they become
+  usable, so the title stays a title with the bird visible behind it. It
+  doubles as the attract screen — leave the run summary alone for 15 seconds
+  and the game drops back here, so the next person to walk up finds the title
+  rather than a stranger's score. Any pointer move or keypress restarts that
+  countdown.
+- **Ready to fly** — the four body controls as chips, FLY NOW at the foot, and
+  the keyboard fallback in small print beneath it.
 - **In-flight HUD** — a star counter that pops on every pickup, a countdown,
   an altitude meter that goes into a red alarm when you drop toward the
   canopy, the pose preview, a combo shout for chained pickups, and a toast
