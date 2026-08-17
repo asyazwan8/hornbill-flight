@@ -202,6 +202,60 @@ function check(name: string, ok: boolean, detail: string) {
   check("dive start fires once per dive", starts === 1, `starts=${starts}`);
 }
 
+/* ---------------- hands up: "I am finished" ---------------- */
+{
+  const m = new GestureMapper();
+  let completions = 0;
+  // Both wrists well above the nose, which sits at y=0.28.
+  for (let i = 0; i < FPS * 2; i++) {
+    if (m.update(body({ wristY: 0.16 }), DT).handsUpComplete) completions++;
+  }
+  check("hands above the head complete", completions === 1, `completions=${completions}`);
+}
+
+{
+  // The gesture has to survive being next to flapping, which is the whole
+  // reason it is measured against the head rather than the shoulders: a
+  // downstroke swings the wrists between y=0.28 and y=0.52, never above 0.23.
+  const m = new GestureMapper();
+  let completions = 0;
+  for (let i = 0; i < FPS * 4; i++) {
+    const wristY = 0.4 + Math.sin(i * DT * Math.PI * 2 * 1.3) * 0.12;
+    if (m.update(body({ wristY, wristReach: 0.2 }), DT).handsUpComplete) completions++;
+  }
+  check("flapping is never read as hands up", completions === 0, `completions=${completions}`);
+}
+
+{
+  const m = new GestureMapper();
+  let completions = 0;
+  for (let i = 0; i < FPS * 2; i++) {
+    if (m.update(body({ wristY: 0.4, wristReach: 0.2 }), DT).handsUpComplete) completions++;
+  }
+  check("a T-pose is not hands up", completions === 0, `completions=${completions}`);
+}
+
+{
+  // Fires once per raise: holding must not retrigger, but lowering and
+  // raising again must.
+  const m = new GestureMapper();
+  let completions = 0;
+  const feed = (wristY: number, seconds: number) => {
+    for (let i = 0; i < FPS * seconds; i++) {
+      if (m.update(body({ wristY }), DT).handsUpComplete) completions++;
+    }
+  };
+  feed(0.16, 3);
+  const afterHold = completions;
+  feed(0.45, 1);
+  feed(0.16, 2);
+  check(
+    "hands up fires once per raise",
+    afterHold === 1 && completions === 2,
+    `after a 3s hold=${afterHold}, after lowering and raising=${completions}`
+  );
+}
+
 /* ---------------- robustness ---------------- */
 {
   const m = new GestureMapper();
