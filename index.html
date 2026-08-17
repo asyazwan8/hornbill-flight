@@ -73,6 +73,16 @@
 
       <button id="mute" class="icon-btn" aria-label="Mute sound" aria-pressed="false">🔊</button>
 
+      <!-- Hand cursor for the on-screen keyboard. The ring fills as a key is
+           dwelt on; at full it counts as a press. -->
+      <div id="pose-cursor" class="pose-cursor hidden" aria-hidden="true">
+        <svg viewBox="0 0 44 44" width="44" height="44">
+          <circle class="cursor-track" cx="22" cy="22" r="15.9" />
+          <circle id="cursor-fill" class="cursor-fill" cx="22" cy="22" r="15.9" />
+          <circle class="cursor-dot" cx="22" cy="22" r="3.5" />
+        </svg>
+      </div>
+
       <!-- ============ Title / ready screen ============ -->
       <div id="title-screen" class="screen hidden">
         <div class="wordmark">
@@ -135,6 +145,10 @@
             </form>
 
             <p id="summary-board-note" class="board-note"></p>
+
+            <!-- Built in JS, shown only when a camera is driving it. -->
+            <div id="pose-keyboard" class="pose-keyboard hidden"></div>
+
             <ol id="summary-board-list" class="board-list"></ol>
 
             <div class="summary-actions">

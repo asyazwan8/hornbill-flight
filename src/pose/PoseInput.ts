@@ -39,6 +39,8 @@ export class PoseInput implements InputSource {
    * screen it was never meant for.
    */
   onHandsUp?: () => void;
+  /** Where the raised hand points each frame, or null when neither is up. */
+  onPointer?: (pointer: { x: number; y: number } | null) => void;
 
   constructor(video: HTMLVideoElement, overlayCanvas: HTMLCanvasElement) {
     this.tracker = new PoseTracker(video);
@@ -67,6 +69,7 @@ export class PoseInput implements InputSource {
     if (gesture.tposeComplete) this.startLatched = true;
     if (gesture.diveStarted) this.onDive?.();
     if (gesture.handsUpComplete) this.onHandsUp?.();
+    this.onPointer?.(gesture.pointer);
     this.steer = gesture.input.steer;
     this.dive = gesture.input.dive;
 

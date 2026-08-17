@@ -1007,6 +1007,19 @@ body {
   overflow-y: auto;
 }
 
+/*
+ * While the keyboard is up the board steps aside entirely.
+ *
+ * Somebody spelling their name is typing, not reading standings, and the
+ * placement they care about is already on the ribbon above. Merely shrinking
+ * the list was not enough: at the 960x540 design size it still pushed DONE
+ * below the fold, and a player driving the screen with their hand has no way
+ * to scroll it back. The board returns the moment the name is posted.
+ */
+.pose-keyboard:not(.hidden) ~ #summary-board-list {
+  display: none;
+}
+
 .score-form {
   display: flex;
   gap: 0.5rem;
@@ -1111,4 +1124,118 @@ body {
   @keyframes combo-fade-out {
     to { opacity: 0; }
   }
+}
+
+/* ---------------- Pose keyboard ---------------- */
+
+.pose-keyboard {
+  margin: 0.5rem 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+}
+
+.key-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+}
+
+.key-row {
+  display: flex;
+  gap: 0.3125rem;
+  justify-content: center;
+}
+
+.key {
+  pointer-events: auto;
+  font-family: var(--ui);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--cream-100);
+  background: rgba(255, 255, 255, 0.09);
+  border: 0.125rem solid rgba(255, 255, 255, 0.22);
+  border-radius: 0.5rem;
+  /* Wide enough to be hittable by a hand from across a room; ten of them
+     still fit the card at the design size. */
+  min-width: 2.125rem;
+  padding: 0.4375rem 0;
+  flex: 1;
+  cursor: pointer;
+  transition: background 90ms ease-out, border-color 90ms ease-out;
+}
+
+.key-wide {
+  flex: 2.4;
+  font-size: 0.8125rem;
+  letter-spacing: 0.0625rem;
+}
+
+.key-post {
+  color: var(--brown-800);
+  background: linear-gradient(var(--gold-300), var(--orange-500));
+  border-color: var(--brown-700);
+}
+
+/* The key the cursor is resting on, while the ring fills. */
+.key.dwelling {
+  background: rgba(255, 212, 59, 0.3);
+  border-color: var(--gold-500);
+}
+
+/*
+ * `:hover` adds a pseudo-class, so `.key:hover` outweighs `.key-post` and was
+ * painting the gold POST key flat grey whenever the pointer crossed it. Each
+ * gets its own hover instead of one rule for both.
+ */
+.key:not(.key-post):hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.key-post:hover {
+  filter: brightness(1.08);
+}
+
+/* ---------------- Hand cursor ---------------- */
+
+.pose-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  /* Centred on the pointer rather than hanging below and right of it. */
+  margin: -1.375rem 0 0 -1.375rem;
+  pointer-events: none;
+  z-index: 10;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+}
+
+.pose-cursor svg {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: block;
+  /* The ring is drawn from twelve o'clock so it fills like a clock face. */
+  transform: rotate(-90deg);
+}
+
+.cursor-track {
+  fill: rgba(13, 43, 63, 0.55);
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 3;
+}
+
+/*
+ * A 100-unit dash around a circle of circumference 100 (r = 15.9), so the
+ * dash offset is a straight percentage: 100 is empty, 0 is a full ring.
+ */
+.cursor-fill {
+  fill: none;
+  stroke: var(--gold-500);
+  stroke-width: 4;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  stroke-linecap: round;
+}
+
+.cursor-dot {
+  fill: var(--gold-500);
 }

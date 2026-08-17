@@ -256,6 +256,63 @@ function check(name: string, ok: boolean, detail: string) {
   );
 }
 
+/* ---------------- pointer ---------------- */
+{
+  // The cursor must mirror: a hand moved to the player's right, which the
+  // unmirrored camera sees drift LEFT across the frame, has to move the
+  // cursor right. Getting this backwards makes the keyboard unusable.
+  const m = new GestureMapper();
+  const at = (wristX: number) => {
+    // Feed enough frames for the smoothing to settle on the target.
+    let p = null as { x: number; y: number } | null;
+    for (let i = 0; i < FPS; i++) {
+      const lm = body({ wristY: 0.35 });
+      lm[LM.leftWrist] = { x: wristX, y: 0.35, z: 0, visibility: 1 };
+      lm[LM.rightWrist] = { x: wristX, y: 0.6, z: 0, visibility: 1 };
+      p = m.update(lm, DT).pointer;
+    }
+    return p;
+  };
+
+  const towardFrameLeft = at(0.3);
+  const towardFrameRight = at(0.7);
+  check(
+    "the cursor mirrors the camera",
+    towardFrameLeft !== null &&
+      towardFrameRight !== null &&
+      towardFrameLeft.x > towardFrameRight.x,
+    `frame-left hand -> x=${towardFrameLeft?.x.toFixed(2)}, frame-right hand -> x=${towardFrameRight?.x.toFixed(2)}`
+  );
+}
+
+{
+  // A hand reaching past the comfortable band should clamp, not run off.
+  const m = new GestureMapper();
+  let p = null as { x: number; y: number } | null;
+  for (let i = 0; i < FPS * 2; i++) {
+    const lm = body({ wristY: 0.35 });
+    lm[LM.leftWrist] = { x: 0.02, y: 0.02, z: 0, visibility: 1 };
+    lm[LM.rightWrist] = { x: 0.02, y: 0.6, z: 0, visibility: 1 };
+    p = m.update(lm, DT).pointer;
+  }
+  check(
+    "the cursor stays on screen at the extremes",
+    p !== null && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1,
+    `x=${p?.x.toFixed(2)}, y=${p?.y.toFixed(2)}`
+  );
+}
+
+{
+  // Arms down is not aiming at anything.
+  const m = new GestureMapper();
+  let p: { x: number; y: number } | null = { x: 0, y: 0 };
+  for (let i = 0; i < FPS; i++) {
+    // Hips sit at y=0.7 in the test body, so wrists below that are hanging.
+    p = m.update(body({ wristY: 0.85, wristReach: 0.02 }), DT).pointer;
+  }
+  check("hands down give no cursor", p === null, `pointer=${JSON.stringify(p)}`);
+}
+
 /* ---------------- robustness ---------------- */
 {
   const m = new GestureMapper();

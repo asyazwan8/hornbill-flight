@@ -1,5 +1,6 @@
 import type { PoseStatus } from "../pose/GestureMapper";
 import type { LeaderboardEntry } from "../leaderboard/Leaderboard";
+import { PoseKeyboard } from "./PoseKeyboard";
 
 /** What the leaderboard section should currently be showing. */
 export type BoardView =
@@ -51,6 +52,9 @@ const RANKING_IDLE_RETURN_MS = 30000;
 
 /** How long the result must have been up before hands-up can end the flight. */
 const END_GESTURE_ARM_MS = 1500;
+
+/** Matches the CHECK constraint on the table; see supabase/schema.sql. */
+const MAX_NAME = 16;
 
 /** The pose captions, in the design's clipped uppercase voice. */
 const POSE_CAPTION: Record<PoseStatus, string> = {
@@ -117,6 +121,10 @@ export class Hud {
 
   readonly overlayCanvas = $<HTMLCanvasElement>("overlay");
 
+  private keyboard = new PoseKeyboard($("pose-keyboard"), $("pose-cursor"), $("cursor-fill"));
+  /** Only offered when a camera is actually driving the cursor. */
+  private keyboardAvailable = false;
+
   /** Called when the screen's main action button is pressed. */
   onAction?: () => void;
   /** Called when the mute toggle changes. */
@@ -170,6 +178,19 @@ export class Hud {
       e.preventDefault();
       this.onSubmitScore?.(this.nameInput.value);
     });
+
+    this.keyboard.onKey = (key) => {
+      if (key.kind === "post") {
+        this.onSubmitScore?.(this.nameInput.value);
+        return;
+      }
+      const current = this.nameInput.value;
+      this.nameInput.value =
+        key.kind === "delete" ? current.slice(0, -1) : (current + key.value).slice(0, MAX_NAME);
+      // A keyboard press is a sign of life; without this the board could time
+      // out and vanish while somebody was still spelling their name.
+      this.armIdleReturn(RANKING_IDLE_RETURN_MS);
+    };
 
     // Enter activates whatever the screen is currently offering, so the game
     // is fully playable without reaching for the mouse.
@@ -546,10 +567,22 @@ export class Hud {
     this.submitButton.disabled = false;
     this.submitButton.textContent = "POST";
     this.scoreForm.classList.remove("hidden");
+    if (this.keyboardAvailable) this.keyboard.show();
   }
 
   hideScoreForm() {
     this.scoreForm.classList.add("hidden");
+    this.keyboard.hide();
+  }
+
+  /** Turn the hand-driven keyboard on once a camera is running. */
+  setKeyboardAvailable(available: boolean) {
+    this.keyboardAvailable = available;
+  }
+
+  /** Feed the cursor. Ignored unless the keyboard is actually up. */
+  setPointer(pointer: { x: number; y: number } | null) {
+    this.keyboard.setPointer(pointer);
   }
 
   setSubmitBusy(busy: boolean) {

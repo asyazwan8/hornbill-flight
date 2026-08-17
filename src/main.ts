@@ -302,6 +302,9 @@ async function main() {
       if (hud.canEndByGesture) hud.showRanking();
     };
 
+    pose.onPointer = (pointer) => hud.setPointer(pointer);
+    hud.setKeyboardAvailable(true);
+
     hud.showPreview();
     game.setInputSource(new CombinedInput([pose, keyboard]));
   };
