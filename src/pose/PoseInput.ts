@@ -32,6 +32,13 @@ export class PoseInput implements InputSource {
   onUpdate?: (status: PoseStatus, message: string, tposeProgress: number) => void;
   /** Fired once when a dive begins, so the game can play the whoosh. */
   onDive?: () => void;
+  /**
+   * Fired once when both hands are held above the head. Delivered as a call
+   * rather than a latch on purpose: it only means anything on the screen that
+   * is up when it happens, and a latch would keep it alive to fire later on a
+   * screen it was never meant for.
+   */
+  onHandsUp?: () => void;
 
   constructor(video: HTMLVideoElement, overlayCanvas: HTMLCanvasElement) {
     this.tracker = new PoseTracker(video);
@@ -59,6 +66,7 @@ export class PoseInput implements InputSource {
     if (gesture.input.flap > 0) this.pendingFlap = Math.max(this.pendingFlap, gesture.input.flap);
     if (gesture.tposeComplete) this.startLatched = true;
     if (gesture.diveStarted) this.onDive?.();
+    if (gesture.handsUpComplete) this.onHandsUp?.();
     this.steer = gesture.input.steer;
     this.dive = gesture.input.dive;
 

@@ -49,6 +49,9 @@ const IDLE_RETURN_MS = 15000;
  */
 const RANKING_IDLE_RETURN_MS = 30000;
 
+/** How long the result must have been up before hands-up can end the flight. */
+const END_GESTURE_ARM_MS = 1500;
+
 /** The pose captions, in the design's clipped uppercase voice. */
 const POSE_CAPTION: Record<PoseStatus, string> = {
   "no-pose": "STEP INTO VIEW",
@@ -131,6 +134,7 @@ export class Hud {
   /** The clock the time meter measures itself against, so bonuses read right. */
   private timeReference = 60;
   private idleTimer: number | null = null;
+  private summaryShownAt = 0;
 
   constructor() {
     this.button.addEventListener("click", () => this.onAction?.());
@@ -193,6 +197,27 @@ export class Hud {
    * same element, told apart by the oversized `hero` treatment, and the START
    * button has to behave differently on each.
    */
+  /** True while the result step of the summary is up. */
+  get onSummaryResult(): boolean {
+    return (
+      !this.summaryScreen.classList.contains("hidden") &&
+      !this.summaryResult.classList.contains("hidden")
+    );
+  }
+
+  /**
+   * Whether a hands-up gesture should be honoured right now. The delay stops
+   * a player whose arms are still above their head from the last flap ending
+   * the flight before they have seen the score.
+   */
+  get canEndByGesture(): boolean {
+    return (
+      this.onSummaryResult &&
+      !this.endButton.classList.contains("hidden") &&
+      performance.now() - this.summaryShownAt > END_GESTURE_ARM_MS
+    );
+  }
+
   get onTitle(): boolean {
     return (
       !this.titleScreen.classList.contains("hidden") && this.titleScreen.classList.contains("hero")
@@ -407,6 +432,7 @@ export class Hud {
     this.summaryRanking.classList.add("hidden");
     this.hideScoreForm();
 
+    this.summaryShownAt = performance.now();
     this.armIdleReturn();
   }
 

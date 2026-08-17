@@ -70,8 +70,15 @@ export class GameAudio {
 
   private _muted = false;
 
-  get ready() {
-    return this.ctx !== null;
+  /**
+   * True once the context is actually running, which is not the same as
+   * having one. Constructing an AudioContext always succeeds, but browsers
+   * leave it suspended until a user gesture unlocks it, so this is the only
+   * honest way to ask whether sound will actually come out. Replaces an
+   * unused `ready` getter that only checked a context existed.
+   */
+  get unlocked(): boolean {
+    return this.ctx?.state === "running";
   }
 
   get muted() {

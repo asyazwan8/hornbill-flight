@@ -136,6 +136,34 @@ async function main() {
     };
   };
 
+  /**
+   * Bring audio up, and keep trying.
+   *
+   * Browsers will not unlock an AudioContext without a user gesture, and a
+   * player who launches by T-pose never makes one -- which is exactly how the
+   * game ended up silent for anybody playing hands-free. There is no way to
+   * force it from script, so instead this is called at every moment audio
+   * might legitimately be allowed: on any press or keystroke, and again at the
+   * start of every run. Once it takes, it stays unlocked for the session.
+   */
+  const ensureAudio = async () => {
+    try {
+      await audio.init();
+      if (!audio.unlocked) return false;
+      audio.startMusic();
+      return true;
+    } catch (err) {
+      console.warn("Audio could not start yet", err);
+      return false;
+    }
+  };
+
+  // Any gesture at all is enough, wherever it lands. Cheap to re-run: init
+  // returns immediately once the context is up.
+  for (const event of ["pointerdown", "keydown", "touchstart"]) {
+    window.addEventListener(event, () => void ensureAudio(), { passive: true });
+  }
+
   const game = new Game(canvas, {
     onScore: (s) => hud.setScore(s),
     onTime: (t) => hud.setTime(t),
@@ -176,7 +204,11 @@ async function main() {
         hud.setTime(ROUND_SECONDS);
         hud.playing();
         poseInput?.reset();
-        audio.launch();
+        // Try again here so a hands-free launch still gets sound the moment
+        // the browser will allow it, rather than staying silent all session.
+        void ensureAudio().then((on) => {
+          if (on) audio.launch();
+        });
       } else if (phase === "gameover") {
         stage = "gameover";
         audio.gameOver();
@@ -194,7 +226,9 @@ async function main() {
           crashed: game.crashed,
           ...placement(score, game.runSeconds),
         });
-        hud.setSummaryHint(poseAvailable ? "Hold a T-pose to fly again." : "");
+        hud.setSummaryHint(
+          poseAvailable ? "T-pose to fly again, or raise both hands to finish." : ""
+        );
         // Without a leaderboard there is no board to end into, so the button
         // that would lead there is not offered.
         hud.setEndFlightAvailable(leaderboardConfigured());
@@ -262,6 +296,12 @@ async function main() {
     };
     pose.onDive = () => audio.dive();
 
+    // Hands above the head on the result page means "I am done": show the
+    // board, the same as pressing END FLIGHT.
+    pose.onHandsUp = () => {
+      if (hud.canEndByGesture) hud.showRanking();
+    };
+
     hud.showPreview();
     game.setInputSource(new CombinedInput([pose, keyboard]));
   };
@@ -273,12 +313,7 @@ async function main() {
 
     // Audio first: it is instant, and doing it inside the click keeps the
     // gesture "live" for browsers that require one to unlock playback.
-    try {
-      await audio.init();
-      audio.startMusic();
-    } catch (err) {
-      console.warn("Audio unavailable", err);
-    }
+    await ensureAudio();
 
     try {
       await startPose();
@@ -331,8 +366,7 @@ async function main() {
       return;
     }
 
-    void audio.init();
-    audio.startMusic();
+    void ensureAudio();
 
     // START on the title always goes by way of the instruction screen, even
     // when the camera is already running. A T-pose is the express route for

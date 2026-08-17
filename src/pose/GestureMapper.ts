@@ -33,6 +33,18 @@ const FLAP_REFRACTORY = 0.18;
 const DIVE_GAP_FULL = 0.35;
 const DIVE_GAP_NONE = 0.7;
 
+/**
+ * Hands up: both wrists lifted clear above the head, which is how a finished
+ * player says they are done.
+ *
+ * Measured against the nose rather than the shoulders, so it cannot be
+ * reached by a flap — arms swing to about shoulder height on a downstroke and
+ * nowhere near above the head. The hold is what separates it from the top of
+ * an enthusiastic upstroke.
+ */
+const HANDS_UP_CLEARANCE = 0.25;
+const HANDS_UP_HOLD = 1.0;
+
 /** Shoulder tilt below this is treated as standing straight. */
 const STEER_DEADZONE = 0.09;
 const STEER_GAIN = 2.6;
@@ -53,6 +65,10 @@ export type GestureState = {
   tposeComplete: boolean;
   /** True on the frame a dive begins, for the whoosh. */
   diveStarted: boolean;
+  /** 0..1 progress of the hands-above-head hold. */
+  handsUpProgress: number;
+  /** True on the single frame both hands have been held up long enough. */
+  handsUpComplete: boolean;
   status: PoseStatus;
   message: string;
 };
@@ -77,6 +93,8 @@ export class GestureMapper {
   private steer = 0;
   private tposeHeld = 0;
   private tposeWasComplete = false;
+  private handsUpHeld = 0;
+  private handsUpWasComplete = false;
   private wasDiving = false;
 
   private pendingFlap = 0;
@@ -84,6 +102,8 @@ export class GestureMapper {
   reset() {
     this.tposeHeld = 0;
     this.tposeWasComplete = false;
+    this.handsUpHeld = 0;
+    this.handsUpWasComplete = false;
     this.wasDiving = false;
     this.pendingFlap = 0;
     this.steer = 0;
@@ -95,6 +115,8 @@ export class GestureMapper {
       input: { flap: 0, steer: 0, dive: 0 },
       tposeProgress: 0,
       tposeComplete: false,
+      handsUpProgress: 0,
+      handsUpComplete: false,
       diveStarted: false,
       status: "no-pose",
       message: "Step into view",
@@ -102,6 +124,7 @@ export class GestureMapper {
 
     if (!landmarks || landmarks.length < 25 || dt <= 0) {
       this.tposeHeld = 0;
+      this.handsUpHeld = 0;
       this.hasHistory = false;
       this.wasDiving = false;
       return idle;
@@ -118,6 +141,7 @@ export class GestureMapper {
     const shouldersSeen = ls.visibility > MIN_VISIBILITY && rs.visibility > MIN_VISIBILITY;
     if (!shouldersSeen) {
       this.tposeHeld = 0;
+      this.handsUpHeld = 0;
       this.hasHistory = false;
       this.wasDiving = false;
       return { ...idle, status: "partial", message: "Show your shoulders" };
@@ -164,6 +188,20 @@ export class GestureMapper {
     const complete = tposeProgress >= 1;
     const tposeComplete = complete && !this.tposeWasComplete;
     this.tposeWasComplete = complete;
+
+    /* ---------------- hands up: "I am finished" ---------------- */
+
+    // y grows downward, so "above the head" is a smaller y than the nose.
+    const handsUp =
+      wristsSeen &&
+      lw.y < nose.y - unit * HANDS_UP_CLEARANCE &&
+      rw.y < nose.y - unit * HANDS_UP_CLEARANCE;
+
+    this.handsUpHeld = handsUp ? this.handsUpHeld + dt : 0;
+    const handsUpProgress = clamp(this.handsUpHeld / HANDS_UP_HOLD, 0, 1);
+    const handsUpDone = handsUpProgress >= 1;
+    const handsUpComplete = handsUpDone && !this.handsUpWasComplete;
+    this.handsUpWasComplete = handsUpDone;
 
     /* ---------------- divebomb: hands brought together ---------------- */
 
@@ -246,6 +284,8 @@ export class GestureMapper {
       input: { flap, steer: this.steer, dive },
       tposeProgress,
       tposeComplete,
+      handsUpProgress,
+      handsUpComplete,
       diveStarted,
       status,
       message,

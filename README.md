@@ -41,6 +41,7 @@ button.
 | **Lean** — tilt your shoulders     | Banks and turns the bird                       |
 | **Hands together** — in front of you | Tucks the wings into a divebomb: fast descent, extra speed |
 | **T-pose** — arms straight out, 1s | Launches a run, from the ready screen or after one ends |
+| **Hands up** — both above your head, 1s | On the result screen, ends the flight and shows the board |
 
 Stand back far enough that your head, both hands and your hips are all in frame.
 The preview in the top-right corner shows the skeleton the game is reading, so
@@ -66,6 +67,20 @@ to the leaderboard, which lives behind **END FLIGHT** on the summary.
 Keyboard controls work at the same time, which is handy for development:
 **Space** to flap, **arrow keys** to steer, **down arrow** (or Shift) to
 divebomb, **Enter** to press whatever button is on screen.
+
+### Sound and hands-free play
+
+Browsers refuse to start an AudioContext until the page has seen a real press
+or keystroke, and a player who launches by T-pose never makes one — which is
+how the game could end up silent for somebody playing entirely hands-free.
+There is no way to force it from script, so the game asks at every moment it
+might be allowed: on any press or keystroke wherever it lands, and again at
+the start of every run. Once it takes, it stays unlocked for the session, so
+in practice a single touch anywhere is enough for the rest of the day.
+
+For a kiosk that will never be touched at all, launch Chrome with
+`--autoplay-policy=no-user-gesture-required` and sound works from the first
+run without anyone pressing anything.
 
 Sound is synthesised in the browser, apart from the hornbill call, which is a
 9KB recording of the real bird. The speaker button in the bottom-right mutes
@@ -100,6 +115,13 @@ the spirit of a mid-90s mascot platformer — across three screens:
   as three tiles, then **FLY AGAIN** or **END FLIGHT**. Ending the flight turns
   the card over to the board — the top ten, where this run places, and the name
   field that posts it — with **DONE** to hand the game back to the title.
+
+  Raising both hands above your head on the result page does the same as
+  pressing END FLIGHT. It is measured against the head rather than the
+  shoulders precisely so a flap can never reach it — a downstroke swings the
+  wrists to about chest height and nowhere near above the head — and it is
+  ignored for the first second and a half so arms still up from the last flap
+  cannot end the flight before the score has been read.
 
   The split keeps the reward and the admin apart: a player going straight back
   up never has to look at a leaderboard, and one who has finished gets the
