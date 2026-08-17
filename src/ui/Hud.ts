@@ -41,14 +41,7 @@ const LOW_ALTITUDE = 0.3;
  * walked off, and the next person should find the title inviting them in
  * rather than a stranger's score.
  */
-const IDLE_RETURN_MS = 15000;
-
-/**
- * The ranking page gets longer. There are ten rows to read, and the player
- * doing the reading is usually stood back from the screen where the only
- * things that reset the countdown -- pointer and keys -- are out of reach.
- */
-const RANKING_IDLE_RETURN_MS = 30000;
+const IDLE_RETURN_MS = 10000;
 
 /** How long the result must have been up before hands-up can end the flight. */
 const END_GESTURE_ARM_MS = 1500;
@@ -122,6 +115,7 @@ export class Hud {
   readonly overlayCanvas = $<HTMLCanvasElement>("overlay");
 
   private keyboard = new PoseKeyboard($("pose-keyboard"), $("pose-cursor"), $("cursor-fill"));
+  private keyboardHint = $("keyboard-hint");
   /** Only offered when a camera is actually driving the cursor. */
   private keyboardAvailable = false;
 
@@ -158,9 +152,7 @@ export class Hud {
       window.addEventListener(
         event,
         () => {
-          if (this.summaryScreen.classList.contains("hidden")) return;
-          const onRanking = !this.summaryRanking.classList.contains("hidden");
-          this.armIdleReturn(onRanking ? RANKING_IDLE_RETURN_MS : IDLE_RETURN_MS);
+          if (!this.summaryScreen.classList.contains("hidden")) this.armIdleReturn();
         },
         { passive: true }
       );
@@ -189,7 +181,7 @@ export class Hud {
         key.kind === "delete" ? current.slice(0, -1) : (current + key.value).slice(0, MAX_NAME);
       // A keyboard press is a sign of life; without this the board could time
       // out and vanish while somebody was still spelling their name.
-      this.armIdleReturn(RANKING_IDLE_RETURN_MS);
+      this.armIdleReturn();
     };
 
     // Enter activates whatever the screen is currently offering, so the game
@@ -470,7 +462,7 @@ export class Hud {
   showRanking() {
     this.summaryResult.classList.add("hidden");
     this.summaryRanking.classList.remove("hidden");
-    this.armIdleReturn(RANKING_IDLE_RETURN_MS);
+    this.armIdleReturn();
     this.onEndFlight?.();
   }
 
@@ -567,11 +559,14 @@ export class Hud {
     this.submitButton.disabled = false;
     this.submitButton.textContent = "POST";
     this.scoreForm.classList.remove("hidden");
+    // The hand controls are only worth explaining when a hand can drive them.
+    this.keyboardHint.classList.toggle("hidden", !this.keyboardAvailable);
     if (this.keyboardAvailable) this.keyboard.show();
   }
 
   hideScoreForm() {
     this.scoreForm.classList.add("hidden");
+    this.keyboardHint.classList.add("hidden");
     this.keyboard.hide();
   }
 
@@ -582,6 +577,10 @@ export class Hud {
 
   /** Feed the cursor. Ignored unless the keyboard is actually up. */
   setPointer(pointer: { x: number; y: number } | null) {
+    // A raised hand counts as presence. Aiming at a key takes longer than the
+    // idle countdown, so without this the board would vanish mid-word from
+    // somebody who is very obviously still there.
+    if (pointer && !this.summaryScreen.classList.contains("hidden")) this.armIdleReturn();
     this.keyboard.setPointer(pointer);
   }
 
