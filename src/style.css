@@ -1191,7 +1191,14 @@ body {
   border-color: var(--brown-700);
 }
 
-/* The key the cursor is resting on, while the ring fills. */
+/* Whatever the cursor is resting on, while the ring fills. POST and DONE are
+   ordinary crate buttons rather than keys, so the outline carries the state
+   for anything the cursor can settle on. */
+.dwelling {
+  outline: 0.1875rem solid var(--gold-500);
+  outline-offset: 0.1875rem;
+}
+
 .key.dwelling {
   background: rgba(255, 212, 59, 0.3);
   border-color: var(--gold-500);

@@ -25,16 +25,25 @@ const DWELL_SLACK = 0.9;
 export type KeyPress =
   | { kind: "char"; value: string }
   | { kind: "delete" }
-  | { kind: "post" };
+  | { kind: "post" }
+  | { kind: "done" };
 
 const ROWS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
 
 export class PoseKeyboard {
   private keys: HTMLButtonElement[] = [];
-  private dwellKey: HTMLButtonElement | null = null;
+  /**
+   * Buttons outside the grid that the cursor can also settle on — POST and
+   * DONE. Without these a player working the screen by hand could type a name
+   * and then have no way to do anything with it.
+   */
+  private extras: HTMLElement[] = [];
+  private dwellKey: HTMLElement | null = null;
   private dwellSince = 0;
   private dwellAt = { x: 0, y: 0 };
-  private visible = false;
+  /** Whether the cursor is live. Broader than the grid: the cursor stays up
+   *  for POST and DONE after the letters have gone. */
+  private active = false;
 
   /** Fired when a key has been dwelt on long enough to count. */
   onKey?: (key: KeyPress) => void;
@@ -62,8 +71,7 @@ export class PoseKeyboard {
     last.className = "key-row";
     last.append(
       this.makeKey("SPACE", { kind: "char", value: " " }, "key-wide"),
-      this.makeKey("DEL", { kind: "delete" }, "key-wide"),
-      this.makeKey("POST", { kind: "post" }, "key-wide key-post")
+      this.makeKey("DEL", { kind: "delete" }, "key-wide")
     );
     rows.append(last);
 
@@ -83,15 +91,27 @@ export class PoseKeyboard {
     return el;
   }
 
-  show() {
-    this.visible = true;
+  /** Register a button outside the grid as something the cursor can press. */
+  addTarget(el: HTMLElement, press: KeyPress) {
+    (el as HTMLElement & { press: KeyPress }).press = press;
+    this.extras.push(el);
+  }
+
+  /** Turn the cursor on or off, independently of the letter grid. */
+  setActive(active: boolean) {
+    this.active = active;
+    if (!active) {
+      this.cursor.classList.add("hidden");
+      this.clearDwell();
+    }
+  }
+
+  showKeys() {
     this.root.classList.remove("hidden");
   }
 
-  hide() {
-    this.visible = false;
+  hideKeys() {
     this.root.classList.add("hidden");
-    this.cursor.classList.add("hidden");
     this.clearDwell();
   }
 
@@ -106,7 +126,7 @@ export class PoseKeyboard {
    * 0..1 screen fraction, or null when no hand is raised.
    */
   setPointer(pointer: { x: number; y: number } | null) {
-    if (!this.visible) return;
+    if (!this.active) return;
 
     if (!pointer) {
       this.cursor.classList.add("hidden");
@@ -146,7 +166,7 @@ export class PoseKeyboard {
     this.cursorFill.style.strokeDashoffset = String(Math.max(0, 100 - progress * 100));
 
     if (progress >= 1) {
-      const press = (key as HTMLButtonElement & { press: KeyPress }).press;
+      const press = (key as HTMLElement & { press: KeyPress }).press;
       this.clearDwell();
       // Park the dwell off any key so holding still does not immediately
       // repeat: the hand has to move away and come back.
@@ -156,9 +176,15 @@ export class PoseKeyboard {
     }
   }
 
-  /** Hit test in screen space, since that is where the cursor lives. */
-  private keyAt(x: number, y: number): HTMLButtonElement | null {
-    for (const key of this.keys) {
+  /**
+   * Hit test in screen space, since that is where the cursor lives. Hidden
+   * targets are skipped: `offsetParent` is null for anything inside a
+   * `display: none` ancestor, which is how the letter grid and the name field
+   * come and go.
+   */
+  private keyAt(x: number, y: number): HTMLElement | null {
+    for (const key of [...this.keys, ...this.extras]) {
+      if (key.offsetParent === null) continue;
       const b = key.getBoundingClientRect();
       if (x >= b.left && x <= b.right && y >= b.top && y <= b.bottom) return key;
     }

@@ -143,7 +143,12 @@ export class Hud {
     this.againButton.addEventListener("click", () => this.onAction?.());
 
     this.endButton.addEventListener("click", () => this.showRanking());
-    this.doneButton.addEventListener("click", () => this.onDone?.());
+    this.doneButton.addEventListener("click", () => this.finishOrDismiss());
+
+    // POST and DONE sit outside the letter grid but still have to be reachable
+    // by hand, or a player could type a name and then be stuck with it.
+    this.keyboard.addTarget(this.submitButton, { kind: "post" });
+    this.keyboard.addTarget(this.doneButton, { kind: "done" });
 
     // Any sign of a person resets the countdown back to the attract screen.
     // Pointer movement counts: someone at a laptop is still here even if they
@@ -174,6 +179,10 @@ export class Hud {
     this.keyboard.onKey = (key) => {
       if (key.kind === "post") {
         this.onSubmitScore?.(this.nameInput.value);
+        return;
+      }
+      if (key.kind === "done") {
+        this.finishOrDismiss();
         return;
       }
       const current = this.nameInput.value;
@@ -361,6 +370,7 @@ export class Hud {
     this.hud.classList.add("hidden");
     this.setTposeProgress(0);
     this.clearIdleReturn();
+    this.keyboard.setActive(false);
   }
 
   /**
@@ -424,6 +434,8 @@ export class Hud {
     this.hud.classList.remove("hidden");
     this.setTposeProgress(0);
     this.clearIdleReturn();
+    // Or the cursor would ride along over the game.
+    this.keyboard.setActive(false);
   }
 
   /** The run summary. */
@@ -451,6 +463,7 @@ export class Hud {
     // reached by ending the flight.
     this.summaryResult.classList.remove("hidden");
     this.summaryRanking.classList.add("hidden");
+    this.keyboard.setActive(false);
     this.hideScoreForm();
 
     this.summaryShownAt = performance.now();
@@ -470,6 +483,9 @@ export class Hud {
   showRanking() {
     this.summaryResult.classList.add("hidden");
     this.summaryRanking.classList.remove("hidden");
+    // Live for the whole page, so DONE stays reachable by hand once the
+    // letters have gone.
+    this.keyboard.setActive(this.keyboardAvailable);
     this.armIdleReturn();
     this.onEndFlight?.();
   }
@@ -569,13 +585,15 @@ export class Hud {
     this.scoreForm.classList.remove("hidden");
     // The hand controls are only worth explaining when a hand can drive them.
     this.keyboardHint.classList.toggle("hidden", !this.keyboardAvailable);
-    if (this.keyboardAvailable) this.keyboard.show();
+    if (this.keyboardAvailable) this.keyboard.showKeys();
+    this.doneButton.textContent = "DONE WITHOUT POST";
   }
 
   hideScoreForm() {
     this.scoreForm.classList.add("hidden");
     this.keyboardHint.classList.add("hidden");
-    this.keyboard.hide();
+    this.keyboard.hideKeys();
+    this.doneButton.textContent = "DONE";
   }
 
   /** Turn the hand-driven keyboard on once a camera is running. */
@@ -595,6 +613,23 @@ export class Hud {
   setSubmitBusy(busy: boolean) {
     this.submitButton.disabled = busy;
     this.submitButton.textContent = busy ? "…" : "POST";
+  }
+
+  /**
+   * DONE means two things on the same screen. While the name field is up it
+   * means "I am not posting this" -- which should still leave the board on
+   * screen, since seeing where the run placed is the reason to be here at
+   * all. Once the field has gone, it means "I am finished" and hands the
+   * game back to the title.
+   */
+  private finishOrDismiss() {
+    if (!this.scoreForm.classList.contains("hidden")) {
+      this.hideScoreForm();
+      this.setBoardNote("");
+      this.armIdleReturn();
+      return;
+    }
+    this.onDone?.();
   }
 
   /** A line above the board, for "Posted as X" and for submit failures. */
