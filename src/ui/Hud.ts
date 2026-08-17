@@ -586,14 +586,12 @@ export class Hud {
     // The hand controls are only worth explaining when a hand can drive them.
     this.keyboardHint.classList.toggle("hidden", !this.keyboardAvailable);
     if (this.keyboardAvailable) this.keyboard.showKeys();
-    this.doneButton.textContent = "DONE WITHOUT POST";
   }
 
   hideScoreForm() {
     this.scoreForm.classList.add("hidden");
     this.keyboardHint.classList.add("hidden");
     this.keyboard.hideKeys();
-    this.doneButton.textContent = "DONE";
   }
 
   /** Turn the hand-driven keyboard on once a camera is running. */
@@ -616,11 +614,11 @@ export class Hud {
   }
 
   /**
-   * DONE means two things on the same screen. While the name field is up it
-   * means "I am not posting this" -- which should still leave the board on
-   * screen, since seeing where the run placed is the reason to be here at
-   * all. Once the field has gone, it means "I am finished" and hands the
-   * game back to the title.
+   * DONE means "finished with this step", which is two different steps on the
+   * same screen. With the name field up it means "not posting this", and
+   * leaves the board and the rank ribbon on screen -- seeing where the run
+   * placed is the reason to be here at all. With the field gone there is
+   * nothing left to be finished with, so it hands the game back to the title.
    */
   private finishOrDismiss() {
     if (!this.scoreForm.classList.contains("hidden")) {
