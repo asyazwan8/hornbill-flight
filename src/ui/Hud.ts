@@ -42,6 +42,13 @@ const LOW_ALTITUDE = 0.3;
  */
 const IDLE_RETURN_MS = 15000;
 
+/**
+ * The ranking page gets longer. There are ten rows to read, and the player
+ * doing the reading is usually stood back from the screen where the only
+ * things that reset the countdown -- pointer and keys -- are out of reach.
+ */
+const RANKING_IDLE_RETURN_MS = 30000;
+
 /** The pose captions, in the design's clipped uppercase voice. */
 const POSE_CAPTION: Record<PoseStatus, string> = {
   "no-pose": "STEP INTO VIEW",
@@ -88,8 +95,10 @@ export class Hud {
   private ribbonRank = $("ribbon-rank");
   private ribbonMessage = $("ribbon-message");
   private againButton = $<HTMLButtonElement>("again-btn");
-  private boardButton = $<HTMLButtonElement>("board-btn");
-  private summaryBoard = $("summary-board");
+  private endButton = $<HTMLButtonElement>("end-btn");
+  private doneButton = $<HTMLButtonElement>("done-btn");
+  private summaryResult = $("summary-result");
+  private summaryRanking = $("summary-ranking");
   private summaryBoardNote = $("summary-board-note");
   private summaryBoardList = $<HTMLOListElement>("summary-board-list");
   private scoreForm = $<HTMLFormElement>("score-form");
@@ -111,8 +120,10 @@ export class Hud {
   onMuteToggle?: (muted: boolean) => void;
   /** Called when the player posts their run to the leaderboard. */
   onSubmitScore?: (name: string) => void;
-  /** Called when the summary's BOARD button reopens the board. */
-  onBoardRequested?: () => void;
+  /** Called when the player ends the flight and wants to see the board. */
+  onEndFlight?: () => void;
+  /** Called when the player is finished with the board. */
+  onDone?: () => void;
   /** Called when the summary has been left alone long enough to go idle. */
   onIdle?: () => void;
 
@@ -125,12 +136,8 @@ export class Hud {
     this.button.addEventListener("click", () => this.onAction?.());
     this.againButton.addEventListener("click", () => this.onAction?.());
 
-    this.boardButton.addEventListener("click", () => {
-      const opening = this.summaryBoard.classList.contains("hidden");
-      this.summaryBoard.classList.toggle("hidden", !opening);
-      this.boardButton.textContent = opening ? "HIDE" : "BOARD";
-      if (opening) this.onBoardRequested?.();
-    });
+    this.endButton.addEventListener("click", () => this.showRanking());
+    this.doneButton.addEventListener("click", () => this.onDone?.());
 
     // Any sign of a person resets the countdown back to the attract screen.
     // Pointer movement counts: someone at a laptop is still here even if they
@@ -139,7 +146,9 @@ export class Hud {
       window.addEventListener(
         event,
         () => {
-          if (!this.summaryScreen.classList.contains("hidden")) this.armIdleReturn();
+          if (this.summaryScreen.classList.contains("hidden")) return;
+          const onRanking = !this.summaryRanking.classList.contains("hidden");
+          this.armIdleReturn(onRanking ? RANKING_IDLE_RETURN_MS : IDLE_RETURN_MS);
         },
         { passive: true }
       );
@@ -165,15 +174,29 @@ export class Hud {
       // Unless the player is typing their name, where Enter belongs to the
       // form -- otherwise posting a score would also fly again.
       if (e.target instanceof HTMLInputElement) return;
-      const button = this.summaryScreen.classList.contains("hidden") ? this.button : this.againButton;
+      const onSummary = !this.summaryScreen.classList.contains("hidden");
+      const onRanking = onSummary && !this.summaryRanking.classList.contains("hidden");
+      const button = onRanking ? this.doneButton : onSummary ? this.againButton : this.button;
       if (button.closest(".hidden") || button.disabled) return;
       e.preventDefault();
-      this.onAction?.();
+      if (onRanking) this.onDone?.();
+      else this.onAction?.();
     });
   }
 
   showPreview() {
     this.preview.classList.remove("hidden");
+  }
+
+  /**
+   * True when the big title is up rather than the ready screen. Both are the
+   * same element, told apart by the oversized `hero` treatment, and the START
+   * button has to behave differently on each.
+   */
+  get onTitle(): boolean {
+    return (
+      !this.titleScreen.classList.contains("hidden") && this.titleScreen.classList.contains("hero")
+    );
   }
 
   /* ---------------- In-flight HUD ---------------- */
@@ -374,26 +397,44 @@ export class Hud {
     this.statAirtime.textContent = `${Math.round(stats.airtimeSeconds)}s`;
     this.statCombo.textContent = `x${stats.bestCombo}`;
 
+    // The ribbon belongs to the ranking page, but the placement is known
+    // now, so it is filled in ready for whenever that page is opened.
     this.setRank(stats.rank, stats.rankMessage);
 
-    // The board opens with the screen -- the summary is the only place it
-    // appears now, so hiding it behind a button would make it easy to never
-    // see. The button and panel are reset together so they cannot disagree.
-    this.summaryBoard.classList.remove("hidden");
-    this.boardButton.textContent = "HIDE";
+    // Always back to step one: the result. The board is a second page,
+    // reached by ending the flight.
+    this.summaryResult.classList.remove("hidden");
+    this.summaryRanking.classList.add("hidden");
     this.hideScoreForm();
 
     this.armIdleReturn();
   }
 
+  /** Whether the board can be reached at all; hides END FLIGHT if not. */
+  setEndFlightAvailable(available: boolean) {
+    this.endButton.classList.toggle("hidden", !available);
+  }
+
+  /**
+   * Step two: the board. Swaps the card's contents rather than opening a
+   * panel underneath, so the ranking gets the whole card and a long board
+   * never pushes the buttons off a short screen.
+   */
+  showRanking() {
+    this.summaryResult.classList.add("hidden");
+    this.summaryRanking.classList.remove("hidden");
+    this.armIdleReturn(RANKING_IDLE_RETURN_MS);
+    this.onEndFlight?.();
+  }
+
   /* ---------------- Attract countdown ---------------- */
 
-  private armIdleReturn() {
+  private armIdleReturn(after = IDLE_RETURN_MS) {
     this.clearIdleReturn();
     this.idleTimer = window.setTimeout(() => {
       this.idleTimer = null;
       this.onIdle?.();
-    }, IDLE_RETURN_MS);
+    }, after);
   }
 
   private clearIdleReturn() {
