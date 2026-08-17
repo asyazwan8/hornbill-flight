@@ -13,10 +13,8 @@ import {
   fetchTop,
   isConfigured as leaderboardConfigured,
   readBest,
-  readName,
   submit,
   writeBest,
-  writeName,
 } from "./leaderboard/Leaderboard";
 
 /** Pose and keyboard at the same time; whichever moves, moves the bird. */
@@ -245,7 +243,7 @@ async function main() {
   // the standings are current, in case somebody posted while this run was in
   // the air, and the placement is recomputed from that fresh read.
   hud.onEndFlight = () => {
-    if (lastRun && lastRun.stars > 0 && leaderboardConfigured()) hud.showScoreForm(readName());
+    if (lastRun && lastRun.stars > 0 && leaderboardConfigured()) hud.showScoreForm("");
     if (!lastRun) return;
     const run = lastRun;
     void loadBoard(TOP_N).then(() => {
@@ -265,8 +263,10 @@ async function main() {
   hud.onSubmitScore = async (rawName) => {
     if (!lastRun) return;
     const name = cleanName(rawName);
-    // Remembered so the next run only needs the button.
-    writeName(name);
+    if (!name) {
+      hud.setBoardNote("Type a name first.");
+      return;
+    }
     hud.setSubmitBusy(true);
     try {
       const stored = await submit({ ...lastRun, name });

@@ -95,9 +95,9 @@ the spirit of a mid-90s mascot platformer — across three screens:
 - **Title** — an oversized wordmark dropped down to meet the bird, with START
   below it and nothing else: the gestures are taught on the ready screen, at
   the point they become usable. It doubles as the attract screen — leave the
-  run summary alone for 15 seconds and the game drops back here, so the next
+  run summary alone for 10 seconds and the game drops back here, so the next
   person to walk up finds the title rather than a stranger's score. Any
-  pointer move or keypress restarts that countdown.
+  pointer move, keypress or raised hand restarts that countdown.
 
   Once the camera is running, a **T-pose does the same thing as pressing
   START** — both open the ready screen — so a player stood across the room
@@ -127,9 +127,11 @@ the spirit of a mid-90s mascot platformer — across three screens:
   The split keeps the reward and the admin apart: a player going straight back
   up never has to look at a leaderboard, and one who has finished gets the
   board with the whole card to itself rather than crammed under the buttons.
-  The board page waits 30 seconds before going idle rather than 15, because
-  ten rows take longer to read than three tiles and the player reading them is
-  usually stood too far back to touch anything.
+  Both pages go idle after 10 seconds untouched. A raised hand counts as being
+  there, which is what keeps the board up while somebody picks their way across
+  the keyboard — aiming at a key takes longer than the countdown, so without
+  that the board would vanish mid-word from a player very obviously still
+  standing in front of it.
 
 The screens were authored at 960×540 and are meant to scale as a whole rather
 than reflow, so every size in `src/style.css` is written in rem against a root
@@ -170,7 +172,15 @@ list steps aside: the player is typing, not reading standings, and at the
 960×540 design size keeping both would push DONE below the fold, where a hand
 cannot scroll it back.
 
-The keys are ordinary buttons, so a mouse works on them too.
+The keys are ordinary buttons, so a mouse works on them too, and the controls
+are spelled out above them whenever a camera is driving the cursor.
+
+The name field starts empty every time. It used to be filled in with the last
+name used on that machine, which is exactly wrong for a game passed between
+people: the next player would post under the previous player's name without
+noticing. An empty name is refused outright rather than standing in a
+placeholder — a board full of "Anonymous" rows is worse than a player who
+chose not to post.
 
 ## Leaderboard
 

@@ -109,8 +109,11 @@ export async function fetchTop(limit = TOP_N): Promise<LeaderboardEntry[]> {
 export async function submit(run: RunResult): Promise<LeaderboardEntry> {
   if (!isConfigured()) throw new Error("No leaderboard is configured.");
 
+  const name = cleanName(run.name);
+  if (!name) throw new Error("A name is needed to post a run.");
+
   const row = {
-    name: cleanName(run.name),
+    name,
     stars: Math.max(0, Math.round(run.stars)),
     // Two decimals is plenty for a tiebreak, and keeps the payload tidy.
     duration_seconds: Math.round(run.durationSeconds * 100) / 100,
@@ -131,15 +134,19 @@ export async function submit(run: RunResult): Promise<LeaderboardEntry> {
   return stored;
 }
 
-/** Trim, collapse whitespace and clip to what the table will accept. */
+/**
+ * Trim, collapse whitespace and clip to what the table will accept.
+ *
+ * Returns an empty string when there is nothing left, rather than inventing a
+ * name. A board full of "Anonymous" rows is worse than a player who chose not
+ * to post, so callers refuse an empty name instead of standing one in.
+ */
 export function cleanName(raw: string): string {
-  const name = raw.replace(/\s+/g, " ").trim().slice(0, MAX_NAME_LENGTH);
-  return name || "Anonymous";
+  return raw.replace(/\s+/g, " ").trim().slice(0, MAX_NAME_LENGTH);
 }
 
 /* ---------------- Things remembered on this device ---------------- */
 
-const NAME_KEY = "hornbill-flight:name";
 const BEST_KEY = "hornbill-flight:best";
 
 /** localStorage throws in private browsing; none of it is worth a crash. */
@@ -158,15 +165,6 @@ function write(key: string, value: string) {
     // Private browsing can refuse writes. A forgotten name or best score is
     // not worth breaking the game over.
   }
-}
-
-/** The name last used on this device, so it only has to be typed once. */
-export function readName(): string {
-  return read(NAME_KEY) ?? "";
-}
-
-export function writeName(name: string) {
-  write(NAME_KEY, cleanName(name));
 }
 
 /**
