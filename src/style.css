@@ -812,21 +812,50 @@ body {
   justify-content: center;
   padding: 1rem;
   background: linear-gradient(var(--ink-700), #1d6a4a);
+  /* Clips the oversized ray square. The card does its own scrolling, so the
+     screen does not need the `overflow-y: auto` it inherits from .screen --
+     which would otherwise turn the rays into scrollable empty space. */
+  overflow: hidden;
 }
 
+/*
+ * The spinning ray pattern behind the summary card.
+ *
+ * A rotating box only keeps a rectangle covered if it is at least as big as
+ * that rectangle's *diagonal* -- otherwise its own corners swing inward and
+ * the screen corners fall outside it, which is what made the pattern look
+ * clipped as it turned. `inset: -25%` was only 150% of the screen, well short
+ * of the diagonal, so this is now an explicit square sized by hypot().
+ *
+ * The square is centred on the rays' vanishing point rather than on the
+ * screen, so the pattern still converges 45% of the way down as the design
+ * has it. That offset centre is further from the bottom corners than the
+ * screen centre is, which is why the square is sized against 120vh rather
+ * than 100vh -- enough to keep those corners covered too.
+ */
 .rays {
   position: absolute;
-  inset: -25%;
+  top: 45%;
+  left: 50%;
+  /* Fallback first, for engines without hypot(). */
+  width: 160vmax;
+  height: 160vmax;
+  width: hypot(100vw, 120vh);
+  height: hypot(100vw, 120vh);
   background: repeating-conic-gradient(
-    from 0deg at 50% 45%,
+    from 0deg at 50% 50%,
     rgba(255, 255, 255, 0.06) 0deg 10deg,
     rgba(255, 255, 255, 0) 10deg 20deg
   );
+  transform: translate(-50%, -50%);
   animation: rays-spin 90s linear infinite;
 }
 
+/* The centring translate has to be repeated in the keyframes, or animating
+   `transform` would drop it and throw the square off-centre. */
 @keyframes rays-spin {
-  to { transform: rotate(360deg); }
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 .summary-card {

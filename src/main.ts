@@ -140,6 +140,15 @@ async function main() {
     onScore: (s) => hud.setScore(s),
     onTime: (t) => hud.setTime(t),
     onAltitude: (fraction) => hud.setAltitude(fraction),
+    // A T-pose on the title opens the instructions rather than launching, so
+    // the gesture and the START button lead to the same place. From the ready
+    // screen and from a finished run it launches, which is what it is for.
+    onStartRequested: () => {
+      if (!hud.onTitle) return true;
+      coachingRequested = true;
+      hud.waiting(poseAvailable);
+      return false;
+    },
     onCollect: (streak) => {
       audio.star(streak);
       hud.popScore();
