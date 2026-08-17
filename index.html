@@ -100,39 +100,47 @@
       <div id="summary-screen" class="screen summary hidden">
         <div class="rays" aria-hidden="true"></div>
         <div class="summary-card">
-          <h1 id="summary-title">FLIGHT OVER</h1>
-          <p id="summary-subtitle" class="summary-subtitle"></p>
+          <!-- Step one: how the run went, and what to do about it. -->
+          <div id="summary-result">
+            <h1 id="summary-title">FLIGHT OVER</h1>
+            <p id="summary-subtitle" class="summary-subtitle"></p>
 
-          <div class="stat-tiles">
-            <div class="tile tile-stars"><div class="tile-value" id="stat-stars">0</div><div class="tile-label">STARS</div></div>
-            <div class="tile"><div class="tile-value" id="stat-airtime">0s</div><div class="tile-label">AIRTIME</div></div>
-            <div class="tile"><div class="tile-value tile-mint" id="stat-combo">x1</div><div class="tile-label">BEST COMBO</div></div>
+            <div class="stat-tiles">
+              <div class="tile tile-stars"><div class="tile-value" id="stat-stars">0</div><div class="tile-label">STARS</div></div>
+              <div class="tile"><div class="tile-value" id="stat-airtime">0s</div><div class="tile-label">AIRTIME</div></div>
+              <div class="tile"><div class="tile-value tile-mint" id="stat-combo">x1</div><div class="tile-label">BEST COMBO</div></div>
+            </div>
+
+            <div class="summary-actions">
+              <button id="again-btn" class="crate-btn">FLY AGAIN</button>
+              <button id="end-btn" class="crate-btn crate-btn-ghost">END FLIGHT</button>
+            </div>
+
+            <p id="summary-hint" class="title-hint"></p>
           </div>
 
-          <div id="rank-ribbon" class="ribbon hidden">
-            <div class="ribbon-rank" id="ribbon-rank">#1</div>
-            <div class="ribbon-message" id="ribbon-message"></div>
-          </div>
+          <!-- Step two: the board, reached by ending the flight. -->
+          <div id="summary-ranking" class="hidden">
+            <h1 id="ranking-title">TOP FLYERS</h1>
 
-          <div class="summary-actions">
-            <button id="again-btn" class="crate-btn">FLY AGAIN</button>
-            <button id="board-btn" class="crate-btn crate-btn-ghost">HIDE</button>
-          </div>
+            <div id="rank-ribbon" class="ribbon hidden">
+              <div class="ribbon-rank" id="ribbon-rank">#1</div>
+              <div class="ribbon-message" id="ribbon-message"></div>
+            </div>
 
-          <!-- The only place the board appears. Open with the screen; the
-               BOARD button collapses it for anyone who just wants to fly. -->
-          <div id="summary-board" class="summary-board">
-            <h2 class="board-title">TOP FLYERS</h2>
             <form id="score-form" class="score-form hidden">
               <label class="sr-only" for="player-name">Your name</label>
               <input id="player-name" class="name-input" type="text" maxlength="16" placeholder="Your name" autocomplete="nickname" spellcheck="false" />
               <button id="submit-score" class="crate-btn crate-btn-small" type="submit">POST</button>
             </form>
+
             <p id="summary-board-note" class="board-note"></p>
             <ol id="summary-board-list" class="board-list"></ol>
-          </div>
 
-          <p id="summary-hint" class="title-hint"></p>
+            <div class="summary-actions">
+              <button id="done-btn" class="crate-btn">DONE</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

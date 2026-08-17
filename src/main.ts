@@ -186,14 +186,9 @@ async function main() {
           ...placement(score, game.runSeconds),
         });
         hud.setSummaryHint(poseAvailable ? "Hold a T-pose to fly again." : "");
-        if (score > 0 && leaderboardConfigured()) hud.showScoreForm(readName());
-        // The ribbon is drawn twice on purpose: once immediately from the
-        // cached board so it is there the instant the screen appears, and
-        // again once a fresh read lands, in case somebody posted mid-flight.
-        void loadBoard(TOP_N).then(() => {
-          const fresh = placement(score, game.runSeconds);
-          hud.setRank(fresh.rank, fresh.rankMessage);
-        });
+        // Without a leaderboard there is no board to end into, so the button
+        // that would lead there is not offered.
+        hud.setEndFlightAvailable(leaderboardConfigured());
       }
     },
   });
@@ -203,11 +198,21 @@ async function main() {
 
   hud.onMuteToggle = (muted) => audio.setMuted(muted);
 
-  // Reopening the board refreshes it, in case someone else posted meanwhile.
-  hud.onBoardRequested = () => {
+  // Ending the flight opens the board. It is re-read rather than reused so
+  // the standings are current, in case somebody posted while this run was in
+  // the air, and the placement is recomputed from that fresh read.
+  hud.onEndFlight = () => {
     if (lastRun && lastRun.stars > 0 && leaderboardConfigured()) hud.showScoreForm(readName());
-    void loadBoard(TOP_N);
+    if (!lastRun) return;
+    const run = lastRun;
+    void loadBoard(TOP_N).then(() => {
+      const fresh = placement(run.stars, run.durationSeconds);
+      hud.setRank(fresh.rank, fresh.rankMessage);
+    });
   };
+
+  // Finished with the board: back to the title for whoever is next.
+  hud.onDone = () => hud.attract(poseAvailable);
 
   // Nobody has touched the summary for a while, so put the title back up for
   // whoever walks up next. The run itself is already over -- this only swaps
@@ -314,13 +319,25 @@ async function main() {
   hud.onAction = () => {
     if (stage === "intro") {
       void enableAndStart();
-    } else {
-      // Both "Fly now" and "Fly again" launch a run directly. Restarting is
-      // deliberately button-only, so leftover arm positions cannot relaunch.
-      void audio.init();
-      audio.startMusic();
-      game.startRun();
+      return;
     }
+
+    void audio.init();
+    audio.startMusic();
+
+    // START on the title always goes by way of the instruction screen, even
+    // when the camera is already running. A T-pose is the express route for
+    // someone who already knows the gestures; pressing the button is what
+    // somebody does when they do not.
+    if (hud.onTitle) {
+      coachingRequested = true;
+      hud.waiting(poseAvailable);
+      return;
+    }
+
+    // FLY NOW and FLY AGAIN launch directly. Restarting is deliberately
+    // button-only, so leftover arm positions cannot relaunch.
+    game.startRun();
   };
 
   // Dev-only handle so the browser tests can fly the real game with a scripted

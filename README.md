@@ -61,7 +61,7 @@ before they have read their score — hold the pose through that pause and it
 launches the moment it lifts, with no need to re-pose.
 
 Note that flying straight into the next run this way skips posting your score
-to the leaderboard, which needs the name field on the summary screen.
+to the leaderboard, which lives behind **END FLIGHT** on the summary.
 
 Keyboard controls work at the same time, which is handy for development:
 **Space** to flap, **arrow keys** to steer, **down arrow** (or Shift) to
@@ -84,7 +84,10 @@ the spirit of a mid-90s mascot platformer — across three screens:
   pointer move or keypress restarts that countdown.
 
   Once the camera is running, a **T-pose launches straight from this screen**,
-  so a player stood across the room never has to touch anything. On a machine
+  so a player stood across the room never has to touch anything. Pressing
+  START instead always goes by way of the ready screen: the pose is the
+  express route for someone who knows the gestures, the button is what
+  somebody presses when they do not. On a machine
   that has run the game before — where camera permission is already granted —
   the pose stack comes up on load without waiting for a click, which is what
   makes that true of a cold page too. A first visit still shows only START:
@@ -95,10 +98,17 @@ the spirit of a mid-90s mascot platformer — across three screens:
   an altitude meter that goes into a red alarm when you drop toward the
   canopy, the pose preview, a combo shout for chained pickups, and a toast
   when stars buy you more time.
-- **Run summary** — stars, airtime and best combo as three tiles, your
-  placement as a rank ribbon, FLY AGAIN, and the leaderboard. This is the only
-  screen the board appears on, so it opens with the screen; HIDE collapses it
-  for anyone who just wants to fly again.
+- **Run summary** — two pages. First the result: stars, airtime and best combo
+  as three tiles, then **FLY AGAIN** or **END FLIGHT**. Ending the flight turns
+  the card over to the board — the top ten, where this run places, and the name
+  field that posts it — with **DONE** to hand the game back to the title.
+
+  The split keeps the reward and the admin apart: a player going straight back
+  up never has to look at a leaderboard, and one who has finished gets the
+  board with the whole card to itself rather than crammed under the buttons.
+  The board page waits 30 seconds before going idle rather than 15, because
+  ten rows take longer to read than three tiles and the player reading them is
+  usually stood too far back to touch anything.
 
 The screens were authored at 960×540 and are meant to scale as a whole rather
 than reflow, so every size in `src/style.css` is written in rem against a root

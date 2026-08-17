@@ -947,22 +947,35 @@ body {
   color: var(--brown-800);
 }
 
-.summary-board {
-  margin-top: 1rem;
-  text-align: left;
+/* ---------------- Summary step two: the ranking ---------------- */
+
+#ranking-title {
+  margin: 0 0 0.75rem;
+  font-family: var(--display);
+  font-size: 2.25rem;
+  font-weight: 400;
+  letter-spacing: 0.1875rem;
+  color: var(--gold-500);
+  text-shadow: 0 0.25rem 0 var(--brown-900);
 }
 
-.summary-board .board-title {
-  text-align: center;
+#summary-ranking .ribbon {
+  margin-top: 0;
+  margin-bottom: 0.875rem;
+}
+
+#summary-ranking .score-form {
+  margin-bottom: 0.75rem;
 }
 
 /*
- * Capped so a full board cannot outgrow the card on a short screen. The
- * actions sit above this block for the same reason: an expanding panel must
- * never push FLY AGAIN out of reach.
+ * Ten rows is the whole point of this page, so it gets the card to itself and
+ * scrolls internally rather than pushing DONE out of reach on a short screen.
  */
-.summary-board .board-list {
-  max-height: 8rem;
+#summary-board-list {
+  text-align: left;
+  max-height: 16rem;
+  overflow-y: auto;
 }
 
 .score-form {
