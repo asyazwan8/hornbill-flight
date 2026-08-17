@@ -243,7 +243,10 @@ async function main() {
   // the standings are current, in case somebody posted while this run was in
   // the air, and the placement is recomputed from that fresh read.
   hud.onEndFlight = () => {
-    if (lastRun && lastRun.stars > 0 && leaderboardConfigured()) hud.showScoreForm("");
+    // Any finished run can be posted, including a scoreless one. Hiding the
+    // field on a zero meant a player who crashed early reached the board and
+    // found no way to put their name on it, with nothing explaining why.
+    if (lastRun && leaderboardConfigured()) hud.showScoreForm("");
     if (!lastRun) return;
     const run = lastRun;
     void loadBoard(TOP_N).then(() => {

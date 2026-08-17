@@ -97,7 +97,7 @@ the spirit of a mid-90s mascot platformer — across three screens:
   the point they become usable. It doubles as the attract screen — leave the
   run summary alone for 10 seconds and the game drops back here, so the next
   person to walk up finds the title rather than a stranger's score. Any
-  pointer move, keypress or raised hand restarts that countdown.
+  pointer move, keypress or sight of a person restarts that countdown.
 
   Once the camera is running, a **T-pose does the same thing as pressing
   START** — both open the ready screen — so a player stood across the room
@@ -127,11 +127,12 @@ the spirit of a mid-90s mascot platformer — across three screens:
   The split keeps the reward and the admin apart: a player going straight back
   up never has to look at a leaderboard, and one who has finished gets the
   board with the whole card to itself rather than crammed under the buttons.
-  Both pages go idle after 10 seconds untouched. A raised hand counts as being
-  there, which is what keeps the board up while somebody picks their way across
-  the keyboard — aiming at a key takes longer than the countdown, so without
-  that the board would vanish mid-word from a player very obviously still
-  standing in front of it.
+  Both pages go idle after 10 seconds untouched — but "untouched" includes the
+  camera. Anybody the pose tracker can see counts as being there, so the
+  countdown only runs on a screen nobody is standing in front of. That is the
+  whole point of it: ten seconds is not long enough to read a score, decide,
+  and reach the button, and without this the summary went home before the
+  player got as far as putting their name in.
 
 The screens were authored at 960×540 and are meant to scale as a whole rather
 than reflow, so every size in `src/style.css` is written in rem against a root
