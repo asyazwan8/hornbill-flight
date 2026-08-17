@@ -311,6 +311,14 @@ export class Hud {
     const lost = status === "no-pose" || status === "partial";
     this.trackPill.classList.toggle("lost", lost);
     this.trackText.textContent = lost ? "STEP BACK" : "TRACKING";
+
+    // Somebody standing in front of the camera is not an idle machine. The
+    // countdown is meant to catch a screen nobody is looking at, and a player
+    // still deciding what to do is not that -- without this the summary went
+    // home while they were reading it, and the name step was never reached.
+    if (status !== "no-pose" && !this.summaryScreen.classList.contains("hidden")) {
+      this.armIdleReturn();
+    }
   }
 
   setTposeProgress(progress: number) {
