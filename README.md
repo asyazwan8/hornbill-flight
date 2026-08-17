@@ -115,9 +115,9 @@ the spirit of a mid-90s mascot platformer — across three screens:
 - **Run summary** — two pages. First the result: stars, airtime and best combo
   as three tiles, then **FLY AGAIN** or **END FLIGHT**. Ending the flight turns
   the card over to the board — the top ten, where this run places, and the name
-  field that posts it. **DONE WITHOUT POST** drops the name field and leaves the
-  standings up; once the field has gone, that same button reads **DONE** and
-  hands the game back to the title.
+  field that posts it. **DONE** drops the name field and leaves the standings up;
+  press it again, with nothing left to finish, and it hands the game back to
+  the title.
 
   Raising both hands above your head on the result page does the same as
   pressing END FLIGHT. It is measured against the head rather than the
