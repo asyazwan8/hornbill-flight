@@ -45,6 +45,22 @@ const DIVE_GAP_NONE = 0.7;
 const HANDS_UP_CLEARANCE = 0.25;
 const HANDS_UP_HOLD = 1.0;
 
+/**
+ * Pointer: a raised hand drives a cursor, for typing a name onto the board.
+ *
+ * The band is the slice of the camera frame a standing player can comfortably
+ * reach, stretched to fill the screen. Mapping the raw frame instead would put
+ * the screen corners at the very edge of the image, where a hand is usually
+ * out of shot, and the player would have to lunge for the outer keys.
+ */
+const POINTER_X_MIN = 0.22;
+const POINTER_X_MAX = 0.78;
+const POINTER_Y_MIN = 0.12;
+const POINTER_Y_MAX = 0.72;
+
+/** Landmarks jitter, and a jittering cursor cannot be aimed. */
+const POINTER_SMOOTHING = 14;
+
 /** Shoulder tilt below this is treated as standing straight. */
 const STEER_DEADZONE = 0.09;
 const STEER_GAIN = 2.6;
@@ -65,6 +81,12 @@ export type GestureState = {
   tposeComplete: boolean;
   /** True on the frame a dive begins, for the whoosh. */
   diveStarted: boolean;
+  /**
+   * Where the raised hand points, as a 0..1 fraction of the screen, already
+   * mirrored so moving a hand right moves the cursor right. Null when neither
+   * hand is raised.
+   */
+  pointer: { x: number; y: number } | null;
   /** 0..1 progress of the hands-above-head hold. */
   handsUpProgress: number;
   /** True on the single frame both hands have been held up long enough. */
@@ -95,6 +117,9 @@ export class GestureMapper {
   private tposeWasComplete = false;
   private handsUpHeld = 0;
   private handsUpWasComplete = false;
+  private pointerX = 0.5;
+  private pointerY = 0.5;
+  private hasPointer = false;
   private wasDiving = false;
 
   private pendingFlap = 0;
@@ -104,6 +129,7 @@ export class GestureMapper {
     this.tposeWasComplete = false;
     this.handsUpHeld = 0;
     this.handsUpWasComplete = false;
+    this.hasPointer = false;
     this.wasDiving = false;
     this.pendingFlap = 0;
     this.steer = 0;
@@ -115,6 +141,7 @@ export class GestureMapper {
       input: { flap: 0, steer: 0, dive: 0 },
       tposeProgress: 0,
       tposeComplete: false,
+      pointer: null,
       handsUpProgress: 0,
       handsUpComplete: false,
       diveStarted: false,
@@ -188,6 +215,39 @@ export class GestureMapper {
     const complete = tposeProgress >= 1;
     const tposeComplete = complete && !this.tposeWasComplete;
     this.tposeWasComplete = complete;
+
+    /* ---------------- pointer: a raised hand drives a cursor ---------------- */
+
+    // Whichever hand is higher is the one doing the pointing, and it has to be
+    // raised at all: an arm hanging at the player's side is not aiming at
+    // anything, and letting it drive the cursor would make the thing twitch
+    // every time somebody shifted their weight.
+    let pointer: { x: number; y: number } | null = null;
+    const hipY = (lh.y + rh.y) / 2;
+    const raised = wristsSeen ? (lw.y < rw.y ? lw : rw) : null;
+
+    if (raised && raised.y < hipY) {
+      // Mirrored: the camera sees the player face on, so their right hand
+      // sits on the left of the frame. The preview is mirrored for the same
+      // reason, and a cursor running the other way would be unusable.
+      const mirroredX = 1 - raised.x;
+      const targetX = clamp((mirroredX - POINTER_X_MIN) / (POINTER_X_MAX - POINTER_X_MIN), 0, 1);
+      const targetY = clamp((raised.y - POINTER_Y_MIN) / (POINTER_Y_MAX - POINTER_Y_MIN), 0, 1);
+
+      if (this.hasPointer) {
+        this.pointerX = damp(this.pointerX, targetX, POINTER_SMOOTHING, dt);
+        this.pointerY = damp(this.pointerY, targetY, POINTER_SMOOTHING, dt);
+      } else {
+        // Snap on the first frame, or the cursor slides in from wherever it
+        // was left and the player watches it drift instead of aiming.
+        this.pointerX = targetX;
+        this.pointerY = targetY;
+        this.hasPointer = true;
+      }
+      pointer = { x: this.pointerX, y: this.pointerY };
+    } else {
+      this.hasPointer = false;
+    }
 
     /* ---------------- hands up: "I am finished" ---------------- */
 
@@ -284,6 +344,7 @@ export class GestureMapper {
       input: { flap, steer: this.steer, dive },
       tposeProgress,
       tposeComplete,
+      pointer,
       handsUpProgress,
       handsUpComplete,
       diveStarted,

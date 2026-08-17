@@ -42,6 +42,7 @@ button.
 | **Hands together** — in front of you | Tucks the wings into a divebomb: fast descent, extra speed |
 | **T-pose** — arms straight out, 1s | Launches a run, from the ready screen or after one ends |
 | **Hands up** — both above your head, 1s | On the result screen, ends the flight and shows the board |
+| **Point** — raise either hand | Drives the cursor on the board's keyboard; rest on a key to type it |
 
 Stand back far enough that your head, both hands and your hips are all in frame.
 The preview in the top-right corner shows the skeleton the game is reading, so
@@ -145,6 +146,31 @@ weight the design uses.
 
 Motion follows the handoff too, and the whole lot is dropped under
 `prefers-reduced-motion` apart from the opacity fades.
+
+### Typing a name without a keyboard
+
+The board carries an on-screen keyboard driven by a raised hand. The cursor
+follows whichever hand is higher, and a key is chosen by **holding still over
+it** for about a second — a ring around the cursor fills as it counts down.
+
+Dwelling rather than any clicking gesture is a deliberate trade. MediaPipe's
+pose model tracks the body, not fingers: it gives a wrist and three coarse
+points for the whole hand, nowhere near enough to tell an open palm from a
+closed one at the distance this game is played from. Reading a pinch out of
+those points misfires constantly, and the hand model that could do it properly
+costs another ~7MB download and another pass over every frame on top of pose
+tracking and a 3D scene. A dwell needs none of that and cannot be misread —
+the only way to select is to genuinely stop moving.
+
+The cursor is mirrored to match the preview, so moving a hand right moves the
+cursor right, and it maps the slice of the frame a standing player can
+comfortably reach rather than the whole image — otherwise the outer keys would
+sit where a hand is already out of shot. While the keyboard is up the board
+list steps aside: the player is typing, not reading standings, and at the
+960×540 design size keeping both would push DONE below the fold, where a hand
+cannot scroll it back.
+
+The keys are ordinary buttons, so a mouse works on them too.
 
 ## Leaderboard
 
@@ -311,6 +337,7 @@ src/
   leaderboard/
     Leaderboard.ts   Supabase over plain fetch, plus the local best score
   ui/Hud.ts          HUD meters, screens, panels and buttons
+  ui/PoseKeyboard.ts on-screen keyboard driven by a raised hand
 scripts/
   fetch-assets.mjs   stages the wasm runtime and pose model into public/
 supabase/
