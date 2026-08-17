@@ -339,7 +339,7 @@ export class Hud {
       top: "HORNBILL",
       bottom: "FLIGHT",
       button: "START",
-      hint: poseAvailable ? "Hold a T-pose to fly, or press START." : "",
+      hint: poseAvailable ? "Hold a T-pose, or press START." : "",
       controls: false,
       hero: true,
     });

@@ -83,11 +83,9 @@ the spirit of a mid-90s mascot platformer — across three screens:
   person to walk up finds the title rather than a stranger's score. Any
   pointer move or keypress restarts that countdown.
 
-  Once the camera is running, a **T-pose launches straight from this screen**,
-  so a player stood across the room never has to touch anything. Pressing
-  START instead always goes by way of the ready screen: the pose is the
-  express route for someone who knows the gestures, the button is what
-  somebody presses when they do not. On a machine
+  Once the camera is running, a **T-pose does the same thing as pressing
+  START** — both open the ready screen — so a player stood across the room
+  never has to touch anything to get going. On a machine
   that has run the game before — where camera permission is already granted —
   the pose stack comes up on load without waiting for a click, which is what
   makes that true of a cold page too. A first visit still shows only START:

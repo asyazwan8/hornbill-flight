@@ -31,6 +31,13 @@ export type GameEvents = {
   onCollect?: (streak: number) => void;
   /** How high the bird is flying, 0 at the treetops to 1 at the ceiling. */
   onAltitude?: (fraction: number) => void;
+  /**
+   * Asked before a latched start signal launches a run. Return false to
+   * swallow it, for a screen that would rather handle the signal itself --
+   * the title uses this to answer a T-pose with the instructions instead of
+   * a run. The signal is consumed either way, so it cannot fire twice.
+   */
+  onStartRequested?: () => boolean;
   /** A wingbeat actually took effect, 0..1 strength. */
   onFlap?: (strength: number) => void;
   /** Bonus time awarded, in seconds. */
@@ -252,7 +259,11 @@ export class Game {
       // behind it, and we watch for the player's start signal.
       this.flight.update(dt, { flap: this.idleFlap(dt), steer: 0.32, dive: 0 });
 
-      if (this.phase === "gameover") this.sinceGameOver += dt;
+      // The uncapped delta on purpose. This pause exists to give a person
+      // time to read their score, so it has to measure wall clock -- `dt` is
+      // capped at 50ms to keep the simulation stable, which would stretch a
+      // 2.5 second pause into much longer on a machine rendering below 20fps.
+      if (this.phase === "gameover") this.sinceGameOver += elapsed;
 
       // A T-pose launches from either screen, but not for a moment after a
       // run ends. During that pause the latch is deliberately left alone
@@ -260,7 +271,9 @@ export class Game {
       // counts the instant the pause expires instead of being swallowed —
       // anything stale from the run itself was cleared in endRun.
       const armed = this.phase === "waiting" || this.sinceGameOver >= RESTART_ARM_DELAY;
-      if (armed && this.input?.startRequested()) this.startRun();
+      if (armed && this.input?.startRequested()) {
+        if (this.events.onStartRequested?.() !== false) this.startRun();
+      }
     } else if (this.phase === "playing") {
       const input: FlightInput = this.input ? this.input.sample(dt) : NO_INPUT;
       const flapped = this.flight.update(dt, input);
