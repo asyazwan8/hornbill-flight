@@ -115,7 +115,9 @@ the spirit of a mid-90s mascot platformer — across three screens:
 - **Run summary** — two pages. First the result: stars, airtime and best combo
   as three tiles, then **FLY AGAIN** or **END FLIGHT**. Ending the flight turns
   the card over to the board — the top ten, where this run places, and the name
-  field that posts it — with **DONE** to hand the game back to the title.
+  field that posts it. **DONE WITHOUT POST** drops the name field and leaves the
+  standings up; once the field has gone, that same button reads **DONE** and
+  hands the game back to the title.
 
   Raising both hands above your head on the result page does the same as
   pressing END FLIGHT. It is measured against the head rather than the
@@ -172,6 +174,11 @@ sit where a hand is already out of shot. While the keyboard is up the board
 list steps aside: the player is typing, not reading standings, and at the
 960×540 design size keeping both would push DONE below the fold, where a hand
 cannot scroll it back.
+
+There is one POST, next to the name field, rather than a second copy among the
+keys. It is registered as a cursor target like everything else, as is DONE, so
+a player working the screen entirely by hand can still post a name or walk away
+from one.
 
 The keys are ordinary buttons, so a mouse works on them too, and the controls
 are spelled out above them whenever a camera is driving the cursor.
