@@ -62,6 +62,16 @@ async function main() {
   const hud = new Hud();
   const audio = new GameAudio();
 
+  /**
+   * The same game served at /demo, cut down to just the flying: no board, no
+   * rank, no name to type, and nothing stored or sent anywhere. A T-pose on
+   * the title also carries straight through the ready screen there, so one
+   * held pose takes a player from the title into a run.
+   */
+  const demo = location.pathname.replace(/\/+$/, "").endsWith("/demo");
+  /** Whether this page reads and posts the shared board at all. */
+  const boardEnabled = !demo && leaderboardConfigured();
+
   const keyboard = new KeyboardInput();
   let poseInput: PoseInput | null = null;
   let poseAvailable = false;
@@ -89,7 +99,7 @@ async function main() {
    * on -- the panel says so quietly and the local best score still stands.
    */
   const loadBoard = async (rows: number, highlightId?: string) => {
-    if (!leaderboardConfigured()) return;
+    if (!boardEnabled) return;
     const token = ++boardToken;
     hud.setLeaderboard({ kind: "loading" });
     try {
@@ -113,7 +123,7 @@ async function main() {
    * instead of claiming an eleventh place it cannot actually know.
    */
   const placement = (stars: number, duration: number): Partial<SummaryStats> => {
-    if (!leaderboardConfigured() || !boardCache || boardCache.length === 0) return {};
+    if (!boardEnabled || !boardCache || boardCache.length === 0) return {};
 
     const better = boardCache.filter(
       (e) => e.stars > stars || (e.stars === stars && e.duration_seconds > duration)
@@ -173,6 +183,10 @@ async function main() {
       if (!hud.onTitle) return true;
       coachingRequested = true;
       hud.waiting(poseAvailable);
+      // The demo keeps counting the pose that opened the ready screen, so a
+      // player who simply keeps holding it launches after a second full hold
+      // rather than having to drop their arms and pose again.
+      if (demo) poseInput?.rearmTpose();
       return false;
     },
     onCollect: (streak) => {
@@ -212,7 +226,7 @@ async function main() {
         audio.gameOver();
         const score = game.score;
         lastRun = { stars: score, durationSeconds: game.runSeconds };
-        if (score > best) {
+        if (!demo && score > best) {
           best = score;
           writeBest(best);
         }
@@ -224,12 +238,17 @@ async function main() {
           crashed: game.crashed,
           ...placement(score, game.runSeconds),
         });
+        // Hands up only ends into the board, so it is only offered with one.
         hud.setSummaryHint(
-          poseAvailable ? "T-pose to fly again, or raise both hands to finish." : ""
+          !poseAvailable
+            ? ""
+            : boardEnabled
+              ? "T-pose to fly again, or raise both hands to finish."
+              : "T-pose to fly again."
         );
         // Without a leaderboard there is no board to end into, so the button
         // that would lead there is not offered.
-        hud.setEndFlightAvailable(leaderboardConfigured());
+        hud.setEndFlightAvailable(boardEnabled);
       }
     },
   });
@@ -246,7 +265,7 @@ async function main() {
     // Any finished run can be posted, including a scoreless one. Hiding the
     // field on a zero meant a player who crashed early reached the board and
     // found no way to put their name on it, with nothing explaining why.
-    if (lastRun && leaderboardConfigured()) hud.showScoreForm("");
+    if (lastRun && boardEnabled) hud.showScoreForm("");
     if (!lastRun) return;
     const run = lastRun;
     void loadBoard(TOP_N).then(() => {
