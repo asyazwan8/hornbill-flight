@@ -101,9 +101,15 @@ showing it off on a stand:
   — arms down and up again. In the demo the pose keeps counting: hold it on
   the title and the ready screen comes up, keep holding and the run launches
   after one more second, with the meter filling again to show it.
+- **The result goes home after 10 seconds, whoever is watching.** The full
+  game holds its summary for as long as the camera can see somebody, because
+  putting a name on the board by hand takes longer than the countdown. The
+  demo has no name to type, and at a stand there is nearly always someone in
+  shot, so there the summary returns to the title 10 seconds after it appears
+  regardless. FLY AGAIN or a T-pose still go again within that time, and a
+  mouse or keyboard touch still restarts the count.
 
-Everything else — the gestures, the clock, the idle return to the title — is
-the full game. It is one page, not a copy: the build writes the same
+Everything else — the gestures, the clock — is the full game. It is one page, not a copy: the build writes the same
 `index.html` to `demo/index.html` as well, and the game reads which mode it is
 in from the address, so any static host serves `/demo` with no rewrite rules.
 

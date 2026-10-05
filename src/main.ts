@@ -71,6 +71,8 @@ async function main() {
   const demo = location.pathname.replace(/\/+$/, "").endsWith("/demo");
   /** Whether this page reads and posts the shared board at all. */
   const boardEnabled = !demo && leaderboardConfigured();
+  // With no name to type, the demo's summary times out on the clock alone.
+  if (demo) hud.cameraKeepsAwake = false;
 
   const keyboard = new KeyboardInput();
   let poseInput: PoseInput | null = null;
