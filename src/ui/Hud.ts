@@ -132,6 +132,15 @@ export class Hud {
   /** Called when the summary has been left alone long enough to go idle. */
   onIdle?: () => void;
 
+  /**
+   * Whether being seen by the camera keeps the summary from going idle. The
+   * full game needs it: putting a name on the board by hand takes longer than
+   * the countdown. The demo turns it off -- there is nothing to do on its
+   * summary but fly again, and at a stand somebody is nearly always in shot,
+   * so the score would otherwise never leave the screen.
+   */
+  cameraKeepsAwake = true;
+
   private muted = false;
   /** The clock the time meter measures itself against, so bonuses read right. */
   private timeReference = 60;
@@ -325,7 +334,11 @@ export class Hud {
     // countdown is meant to catch a screen nobody is looking at, and a player
     // still deciding what to do is not that -- without this the summary went
     // home while they were reading it, and the name step was never reached.
-    if (status !== "no-pose" && !this.summaryScreen.classList.contains("hidden")) {
+    if (
+      this.cameraKeepsAwake &&
+      status !== "no-pose" &&
+      !this.summaryScreen.classList.contains("hidden")
+    ) {
       this.armIdleReturn();
     }
   }
@@ -604,7 +617,9 @@ export class Hud {
     // A raised hand counts as presence. Aiming at a key takes longer than the
     // idle countdown, so without this the board would vanish mid-word from
     // somebody who is very obviously still there.
-    if (pointer && !this.summaryScreen.classList.contains("hidden")) this.armIdleReturn();
+    if (this.cameraKeepsAwake && pointer && !this.summaryScreen.classList.contains("hidden")) {
+      this.armIdleReturn();
+    }
     this.keyboard.setPointer(pointer);
   }
 

@@ -93,6 +93,11 @@ export class PoseInput implements InputSource {
     return requested;
   }
 
+  /** Let a T-pose that is still held count again after another full hold. */
+  rearmTpose() {
+    this.mapper.rearmTpose();
+  }
+
   /** Clear the gesture history, e.g. between runs. */
   reset() {
     this.mapper.reset();

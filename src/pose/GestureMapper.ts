@@ -136,6 +136,17 @@ export class GestureMapper {
     this.hasHistory = false;
   }
 
+  /**
+   * Start the T-pose hold over without the arms coming down, so a pose that
+   * is still being held counts again once it has been held a full
+   * TPOSE_HOLD more. Without this a completed hold stays spent until the
+   * player drops their arms and strikes the pose afresh.
+   */
+  rearmTpose() {
+    this.tposeHeld = 0;
+    this.tposeWasComplete = false;
+  }
+
   update(landmarks: Landmarks | null, dt: number): GestureState {
     const idle: GestureState = {
       input: { flap: 0, steer: 0, dive: 0 },

@@ -87,6 +87,32 @@ Sound is synthesised in the browser, apart from the hornbill call, which is a
 9KB recording of the real bird. The speaker button in the bottom-right mutes
 everything.
 
+## Demo mode
+
+The same game is also served at **`/demo`**, cut down to just the flying, for
+showing it off on a stand:
+
+- **No leaderboard.** The board is never read or posted to, there is no rank,
+  no END FLIGHT and no name to type. The result page offers FLY AGAIN and
+  nothing else, and raising both hands does nothing there. Nothing is stored
+  in the browser either, so a demo machine keeps no scores at all.
+- **One T-pose from the title to the sky.** In the full game the T-pose that
+  opens the ready screen is spent, and launching takes a second, fresh pose
+  — arms down and up again. In the demo the pose keeps counting: hold it on
+  the title and the ready screen comes up, keep holding and the run launches
+  after one more second, with the meter filling again to show it.
+- **The result goes home after 10 seconds, whoever is watching.** The full
+  game holds its summary for as long as the camera can see somebody, because
+  putting a name on the board by hand takes longer than the countdown. The
+  demo has no name to type, and at a stand there is nearly always someone in
+  shot, so there the summary returns to the title 10 seconds after it appears
+  regardless. FLY AGAIN or a T-pose still go again within that time, and a
+  mouse or keyboard touch still restarts the count.
+
+Everything else — the gestures, the clock — is the full game. It is one page, not a copy: the build writes the same
+`index.html` to `demo/index.html` as well, and the game reads which mode it is
+in from the address, so any static host serves `/demo` with no rewrite rules.
+
 ## The interface
 
 The UI is built to a design handoff — a chunky tropical-arcade direction, in

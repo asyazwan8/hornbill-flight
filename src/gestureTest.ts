@@ -95,6 +95,35 @@ function check(name: string, ok: boolean, detail: string) {
 }
 
 {
+  // A held T-pose counts once, until the game re-arms it -- then the same
+  // unbroken hold counts again after another full second. This is what lets
+  // /demo go from the title to a launch without the arms coming down.
+  const m = new GestureMapper();
+  const tpose = body({ wristY: 0.4, wristReach: 0.2 });
+  let first = 0;
+  for (let i = 0; i < FPS * 2 && !first; i++) {
+    if (m.update(tpose, DT).tposeComplete) first = i + 1;
+  }
+  let unarmed = 0;
+  for (let i = 0; i < FPS * 2; i++) if (m.update(tpose, DT).tposeComplete) unarmed++;
+
+  m.rearmTpose();
+  let rearmed = 0;
+  let framesToRearm = 0;
+  for (let i = 0; i < FPS * 2; i++) {
+    if (m.update(tpose, DT).tposeComplete) {
+      rearmed++;
+      if (!framesToRearm) framesToRearm = i + 1;
+    }
+  }
+  check(
+    "a held T-pose counts again only once re-armed",
+    first > 0 && unarmed === 0 && rearmed === 1 && Math.abs(framesToRearm / FPS - 1.0) < 0.15,
+    `unarmed=${unarmed}, rearmed=${rearmed} after ${(framesToRearm / FPS).toFixed(2)}s`
+  );
+}
+
+{
   // Arms hanging down must never read as a T-pose.
   const m = new GestureMapper();
   let completions = 0;
